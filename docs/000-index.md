@@ -1,6 +1,6 @@
-# PDF Generator Documentation Index
+# pndcgn Documentation Index
 
-Compliant with AI-GUIDELINES.md
+Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ Compliant with AI-GUIDELINES.md
 
 ## 1. Introduction
 
-This documentation set provides comprehensive guidance for the PDF Generator tool, an advanced system for creating organized, hyperlinked PDF documentation from project source files. The tool features intelligent caching, parallel processing, and a sophisticated filter-based architecture.
+This documentation set provides comprehensive guidance for the **pndcgn** tool, an advanced system for creating organized, hyperlinked documentation outputs (PDF, HTML, EPUB, and more) from project source files. The tool features intelligent caching, parallel processing, and a sophisticated filter-based architecture.
 
 **Target Audience**: All documentation is written to be clear, actionable, and suitable for junior developers to understand and implement.
 
@@ -33,7 +33,7 @@ This documentation set provides comprehensive guidance for the PDF Generator too
 
 ## 2. Quick Start
 
-**New to PDF Generator?** Start here:
+**New to pndcgn?** Start here:
 
 1. Read [010-overview.md](010-overview.md) for system overview and core objectives
 2. Review [030-installation.md](030-installation.md) for setup instructions
@@ -87,7 +87,7 @@ This documentation set provides comprehensive guidance for the PDF Generator too
 - Manual installation → [030-installation.md](030-installation.md)
 - Prerequisites verification → [030-installation.md](030-installation.md)
 
-**Using PDF Generator**:
+**Using pndcgn**:
 - First run → [040-user-guide.md](040-user-guide.md)
 - CLI options → [040-user-guide.md](040-user-guide.md)
 - Resuming interrupted runs → [040-user-guide.md](040-user-guide.md)
@@ -111,7 +111,7 @@ This documentation set provides comprehensive guidance for the PDF Generator too
 
 ## 5. Document Formatting Standards
 
-All documentation follows these standards from AI-GUIDELINES:
+All documentation follows these standards from AGENTS.md:
 
 - **Plain H1 headings**: No HTML anchors (e.g., `# Document Title`)
 - **Numbered headings**: All headings below H1 are numbered (1, 1.1, 1.1.1)
@@ -134,4 +134,4 @@ This project uses **shellspec** for BDD/TDD testing of shell scripts:
 
 ## 7. Navigation
 
-[↑ Top](#pdf-generator-documentation-index) | [Next: Overview →](010-overview.md)
+[↑ Top](#pndcgn-documentation-index) | [Next: Overview →](010-overview.md)

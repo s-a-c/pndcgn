@@ -89,7 +89,7 @@
 - Exit codes: 0 = success, 1 = error, 2 = invalid usage
 - Work as part of pipelines: Accept paths as arguments
 - Respect XDG standards: State in `$XDG_STATE_HOME/pndcgn/`
-- Configuration in `pdf-generator.toml` or `$XDG_CONFIG_HOME`
+- Configuration in `pndcgn.toml` or `$XDG_CONFIG_HOME`
 
 **No Surprises**: Minimize side effects, explicit over implicit.
 
@@ -120,8 +120,8 @@
 
 **Organization**:
 ```
-bin/pdf-generator        # Main controller
-src/constants.sh         # ANSI codes and shared constants  
+bin/pndcgn               # Main controller
+src/constants.sh         # ANSI codes and shared constants
 src/database.sh          # SQLite operations (not yet implemented)
 src/processing.sh        # Conversion logic (not yet implemented)
 src/utilities.sh         # Helper functions (not yet implemented)
@@ -163,7 +163,7 @@ tests/*.spec.sh          # ShellSpec test files
 **Precedence** (highest to lowest):
 1. Command-line arguments (`--type pdf`)
 2. Environment variables (`PNDCGN_VERBOSE=1`)
-3. TOML configuration (`pdf-generator.toml`)
+3. TOML configuration (`pndcgn.toml`)
 4. Built-in defaults (hardcoded)
 
 **TOML Parsing**:
@@ -239,7 +239,7 @@ End
 ### 4. Compliance Requirements
 
 **AI Agent Compliance** (per AGENTS.md):
-- All AI-authored artifacts MUST include acknowledgment header: 
+- All AI-authored artifacts MUST include acknowledgment header:
   `Compliant with AGENTS.md v<checksum>`
 - Sensitive actions MUST cite exact rule with file and line reference
 - Guidelines checksum MUST be current at time of authoring
@@ -336,8 +336,8 @@ ${PNDCGN_OUTPUT_ROOT}/
 
 ---
 
-**Version**: 1.0.0  
-**Ratified**: 2025-12-14  
+**Version**: 1.0.0
+**Ratified**: 2025-12-14
 **Last Amended**: 2025-12-14
 
 **Compliance**: Compliant with AGENTS.md v1.0

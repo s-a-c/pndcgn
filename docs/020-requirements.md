@@ -1,6 +1,6 @@
 # Requirements Specification
 
-Compliant with AI-GUIDELINES.md
+Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ Compliant with AI-GUIDELINES.md
 
 ## 1. Introduction
 
-This document specifies requirements for the PDF Generator tool using Behavior-Driven Development (BDD) methodology. Requirements are expressed as user stories with clear acceptance criteria, examples of desired behavior, and examples of undesired behavior.
+This document specifies requirements for the **pndcgn** tool using Behavior-Driven Development (BDD) methodology. Requirements are expressed as user stories with clear acceptance criteria, examples of desired behavior, and examples of undesired behavior.
 
 **Purpose**: Define what the system must do from the user's perspective, providing a foundation for system tests and implementation.
 
@@ -92,14 +92,14 @@ So that I can customize tool behavior without editing code
 ```
 
 **Acceptance Criteria**:
-- `pndcgn --init` creates `pdf-generator.toml`
+- `pndcgn --init` creates `pndcgn.toml` (or config file name TBD)
 - Configuration file includes sensible defaults
 - Tool exits after creating config
 - Error if config file already exists
 
 **Desired Behavior**:
 - `pndcgn --init` creates config with output_root, default format
-- Confirmation message: "Created default configuration at: pdf-generator.toml"
+- Confirmation message: "Created default configuration at: pndcgn.toml"
 - Existing config not overwritten without confirmation
 
 **Undesired Behavior**:
@@ -147,7 +147,7 @@ So that I can generate HTML, EPUB, or other formats
 **Acceptance Criteria**:
 - `--type` argument specifies output format
 - PDF is default format
-- Output directory reflects format: `pndcgn/pdf-{run_id}/`
+- Output directory reflects format: `${TARGET_DIR}/.pndcgn/${TYPE}-${RUN_ID}/`
 - Filter chain adapts to output format
 
 **Desired Behavior**:
@@ -297,6 +297,36 @@ So that I can start fresh
 ```
 
 **Acceptance Criteria**:
+
+#### REQ-011: Interactive Source Selection (fzf)
+
+**Story**:
+```
+As a documentation maintainer
+I want to interactively select a source directory when I don't specify one
+So that I can quickly choose from available folders without typing paths
+```
+
+**Acceptance Criteria**:
+- If `fzf` is installed and SOURCE_DIR is not provided, offer interactive folder selection
+- Only directories (folders) are displayed, not files
+- User can cancel selection (falls back to current directory)
+- If `fzf` is not installed, silently fall back to current directory (no error)
+- Integration is optional and does not affect normal operation
+
+**Desired Behavior**:
+- `pndcgn` (no arguments) opens `fzf` with directory list if `fzf` installed
+- User selects directory from fuzzy finder interface
+- Selected directory used as SOURCE_DIR
+- If `fzf` not installed, uses current directory without error
+
+**Undesired Behavior**:
+- Error message when `fzf` not installed
+- Files shown in selection interface
+- Tool fails if `fzf` unavailable
+- Selection required even when SOURCE_DIR provided
+
+**Acceptance Criteria**:
 - `--drop` removes all output directories and cache
 - Confirmation required
 - Fresh state after completion
@@ -311,9 +341,37 @@ So that I can start fresh
 - Partial deletion leaving inconsistent state
 - Source files accidentally deleted
 
+#### REQ-011: Interactive Source Selection (fzf)
+
+**Story**:
+```
+As a documentation maintainer
+I want to interactively select a source directory when I don't specify one
+So that I can quickly choose from available folders without typing paths
+```
+
+**Acceptance Criteria**:
+- If `fzf` is installed and SOURCE_DIR is not provided, offer interactive folder selection
+- Only directories (folders) are displayed, not files
+- User can cancel selection (falls back to current directory)
+- If `fzf` is not installed, silently fall back to current directory (no error)
+- Integration is optional and does not affect normal operation
+
+**Desired Behavior**:
+- `pndcgn` (no arguments) opens `fzf` with directory list if `fzf` installed
+- User selects directory from fuzzy finder interface
+- Selected directory used as SOURCE_DIR
+- If `fzf` not installed, uses current directory without error
+
+**Undesired Behavior**:
+- Error message when `fzf` not installed
+- Files shown in selection interface
+- Tool fails if `fzf` unavailable
+- Selection required even when SOURCE_DIR provided
+
 ### 3.5. Output and Reporting
 
-#### REQ-011: Progress Indicators
+#### REQ-012: Progress Indicators
 
 **Story**:
 ```
@@ -338,7 +396,7 @@ So that I know the tool is working and how long to wait
 - Progress stuck or incorrect
 - Spinner floods console
 
-#### REQ-012: Statistics Reporting
+#### REQ-013: Statistics Reporting
 
 **Story**:
 ```
@@ -365,7 +423,7 @@ So that I can understand performance and coverage
 
 ### 3.6. Run Management
 
-#### REQ-013: Run Resumption
+#### REQ-014: Run Resumption
 
 **Story**:
 ```
@@ -390,7 +448,7 @@ So that I don't lose progress from crashes
 - No detection of incomplete runs
 - Resume uses stale data
 
-#### REQ-014: Fingerprinting
+#### REQ-015: Fingerprinting
 
 **Story**:
 ```
@@ -416,11 +474,11 @@ So that resumption is safe and consistent
 - Resume with changed sources
 - Inconsistent output
 
-#### REQ-015: Dry-Run Finalization
+#### REQ-016: Dry-Run Finalization
 
 **Story**:
 ```
-As a documentation maintainer  
+As a documentation maintainer
 I want to finalize a previous dry-run
 So that I can review before committing to generation
 ```
@@ -456,11 +514,12 @@ So that I can review before committing to generation
 | REQ-008 | Dry Run Preview | TEST-008 |
 | REQ-009 | Clean Specific Runs | TEST-009 |
 | REQ-010 | Drop All Outputs | TEST-010 |
-| REQ-011 | Progress Indicators | TEST-011 |
-| REQ-012 | Statistics Reporting | TEST-012 |
-| REQ-013 | Run Resumption | TEST-013 |
-| REQ-014 | Fingerprinting | TEST-014 |
-| REQ-015 | Dry-Run Finalization | TEST-015 |
+| REQ-011 | Interactive Source Selection (fzf) | TEST-011 |
+| REQ-012 | Progress Indicators | TEST-012 |
+| REQ-013 | Statistics Reporting | TEST-013 |
+| REQ-014 | Run Resumption | TEST-014 |
+| REQ-015 | Fingerprinting | TEST-015 |
+| REQ-016 | Dry-Run Finalization | TEST-016 |
 
 **Note**: Test IDs map to shellspec tests in [100-system-test-plan.md](100-system-test-plan.md)
 

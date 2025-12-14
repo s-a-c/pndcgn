@@ -1,151 +1,42 @@
 # ============================================================================
-# 1. SELF-PRESERVATION & OLD SETUP
+# Laravel Framework
 # ============================================================================
-
-# Ignore chezmoi's own config and source directories
-.config/chezmoi
-.local/share/chezmoi
-
-# Ignore old stow dotfiles repos
-dotfiles*
+/tmp
+.env
+.envrc
+.secrets
 
 # ============================================================================
-# 2. TOP-LEVEL $HOME DIRECTORIES
+# IDE / Editor Directories
 # ============================================================================
-
-# Ignore large personal data directories
-Applications
-Desktop
-Documents
-Downloads
-Library
-Movies
-Music
-Pictures
-Public
-.Trash
-.Trashes
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+.phpactor.json
 
 # ============================================================================
-# 3. SECRETS (FOUND DURING IMPORT)
+# Development Tools & Configuration
 # ============================================================================
-
-.config/.semgrep/settings.yml
-.config/clara/ollama/id_ed25519
-.config/clara/ollama/id_ed25519
-.config/claude/claude.json
-.config/claude/claude.json*
-.config/claude/claude.json.backup
-.config/goose/config.yaml*
-.config/raycast/config.json*
-.env/
-.env*
-*.env
-
-# =CSS-IGNORE-BLOCK {
-# ============================================================================
-# 4. CACHE, STATE, & JUNK DIRS (FROM EZA -R LOG & .GITIGNORE)
-# ============================================================================
-
-# --- General Cache & State ---
-.cache
-.local # This is broad but matches your old .gitignore
-.DS_Store
-*.sock
-*.log
-.history
-.bash_history
-.zsh_history
-.zcompdump*
-
-# --- OS-specific (from .gitignore) ---
-Thumbs.db
-.AppleDouble
-._*
-
-# --- Log files (from .gitignore) ---
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# --- Misc (from .gitignore) ---
-.npm/
-.yarn/
+# Trunk.io: .trunk/trunk.yaml is tracked, but .trunk/.gitignore handles
+# what's ignored within .trunk (plugins, actions, tools, etc.)
+# Note: .trunk is excluded from linters/test runners but config files are tracked
 
 # ============================================================================
-# 5. LARGE APPLICATION DATA DIRS (This is the crucial new part)
+# AI Agent Rules (excluded from version control)
 # ============================================================================
-
-# --- IDEs / Editors (from .gitignore) ---
-.idea/
-.vscode/
-
-# --- Other App Data (from existing ignore) ---
-.config/aitk/
-.config/atlassian-cli/
-.config/cabal/
-.config/caddy/
-.config/configstore/
-.config/containers/
-.config/crush/
-.config/cursor/
-.config/docker/
-.config/gcloud/
-.configImage of the human digestive system
-.config/gemini/
-.config/github-copilot/
-.config/idea/
-.config/lmstudio/
-.config/lsp4ij/
-.config/opencode/
-.config/psysh/
-.config/refact/
-.config/tinkerwell/
-.config/uv/
-.config/vs-kubernetes/
-.config/vscode/
-.config/vscode-insiders/
+.clinerules/byterover-rules.md
+.kilocode/rules/byterover-rules.md
+.roo/rules/byterover-rules.md
+.windsurf/rules/byterover-rules.md
+.cursor/rules/byterover-rules.mdc
+.kiro/steering/byterover-rules.md
+.qoder/rules/byterover-rules.md
+.augment/rules/byterover-rules.md
 
 # ============================================================================
-# 6. BUILD & PACKAGE DIRS (from .gitignore)
+# Project-Specific Patterns
 # ============================================================================
-node_modules/
-dist/
-tmp/
-vendor/
-build/
-coverage/
-.nyc_output/
-.angular/cache
-.sass-cache/
-.trunk/
-emacs/.local/straight/
-venv/
-
-# --- Build artifacts (from .gitignore) ---
-*.o
-*.a
-*.so
-*.bundle
-
-# --- Lock files (from .gitignore) ---
-package-lock.json
-yarn.lock
-
-# ============================================================================
-# 7. EDITOR BACKUPS & TEMP FILES (from .gitignore)
-# ============================================================================
-*~
-\#*\#
-.\#*
-*.elc
-*.bak
-*.tmp
-*.orig
-[._]*.s[a-v][a-z]
-[._]*.sw[a-p]
-[._]*.un~
-*.swp
-*.swo
-**/vim/undodir/*
-.netrwhist
+# Ignore files/folders with digit-only names (no extension) at any directory level
+**/[0-9]*

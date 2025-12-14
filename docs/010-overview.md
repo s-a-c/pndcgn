@@ -1,59 +1,64 @@
-# PDF Generator Overview
+# pndcgn Overview
 
-Compliant with AI-GUIDELINES.md
+Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
 ## Table of Contents
 
 <details>
 <summary>Expand Table of Contents</summary>
 
-- [1. Introduction](#1-introduction)
-- [2. Core Objective](#2-core-objective)
-- [3. System Features Overview](#3-system-features-overview)
-  - [3.1. Intelligent Caching](#31-intelligent-caching)
-  - [3.2. Parallel Processing](#32-parallel-processing)
-  - [3.3. Dynamic Filter Chain](#33-dynamic-filter-chain)
-  - [3.4. Dewey Decimal Naming](#34-dewey-decimal-naming)
-  - [3.5. Run Management](#35-run-management)
-  - [3.6. Statistics and Reporting](#36-statistics-and-reporting)
-- [4. Design Philosophy](#4-design-philosophy)
-  - [4.1. Speed Through Intelligence](#41-speed-through-intelligence)
-  - [4.2. User Experience](#42-user-experience)
-  - [4.3. Extensibility](#43-extensibility)
-  - [4.4. Reliability](#44-reliability)
-- [5. Prerequisites Summary](#5-prerequisites-summary)
-- [6. Quick Start](#6-quick-start)
-- [7. Navigation](#7-navigation)
+- [pndcgn Overview](#pndcgn-overview)
+  - [Table of Contents](#table-of-contents)
+  - [1. Introduction](#1-introduction)
+  - [2. Core Objective](#2-core-objective)
+  - [3. System Features Overview](#3-system-features-overview)
+    - [3.1. Intelligent Caching](#31-intelligent-caching)
+    - [3.2. Parallel Processing](#32-parallel-processing)
+    - [3.3. Dynamic Filter Chain](#33-dynamic-filter-chain)
+    - [3.4. Dewey Decimal Naming](#34-dewey-decimal-naming)
+    - [3.5. Interactive Source Selection (fzf)](#35-interactive-source-selection-fzf)
+    - [3.6. Run Management](#36-run-management)
+    - [3.7. Statistics and Reporting](#37-statistics-and-reporting)
+  - [4. Design Philosophy](#4-design-philosophy)
+    - [4.1. Speed Through Intelligence](#41-speed-through-intelligence)
+    - [4.2. User Experience](#42-user-experience)
+    - [4.3. Extensibility](#43-extensibility)
+    - [4.4. Reliability](#44-reliability)
+  - [5. Prerequisites Summary](#5-prerequisites-summary)
+  - [6. Quick Start](#6-quick-start)
+  - [7. Navigation](#7-navigation)
 
 </details>
 
 ## 1. Introduction
 
-PDF Generator is an advanced documentation tool that transforms project source files into organized, hyperlinked PDF documentation. The system addresses the challenge of creating maintainable, navigable documentation from complex project structures by combining intelligent caching, parallel processing, and a sophisticated filter-based architecture.
+**pndcgn** is an advanced documentation tool that transforms project source files into organized, hyperlinked documentation outputs (PDF, HTML, EPUB, and more). The system addresses the challenge of creating maintainable, navigable documentation from complex project structures by combining intelligent caching, parallel processing, and a sophisticated filter-based architecture.
 
-**Primary Goal**: Automate the generation of comprehensive PDF documentation while maintaining speed, organization, and ease of navigation through intelligent design decisions.
+**Primary Goal**: Automate the generation of comprehensive documentation outputs while maintaining speed, organization, and ease of navigation through intelligent design decisions.
 
-**Target Users**: Development teams and technical writers who need to generate professional PDF documentation from project source files with minimal manual intervention.
+**Target Users**: Development teams and technical writers who need to generate professional documentation from project source files with minimal manual intervention.
 
 ## 2. Core Objective
 
-Create a shell script that traverses a project directory and generates a consolidated, hyperlinked, and logically sorted set of PDF documents stored in a flat directory structure at `prerendered/pdf/`.
+Create a shell script that traverses a project directory and generates a consolidated, hyperlinked, and logically sorted set of documentation outputs (default: PDF) stored in a deterministic run directory structure under the target directory (default: `${TARGET_DIR}/.pndcgn/${TYPE}-${RUN_ID}/`).
 
 **Key Requirements**:
-- Process markdown, code, and diagram files into professional PDFs
+
+- Process markdown, code, and diagram files into professional documentation outputs
 - Maintain fast execution through intelligent caching
 - Provide clear progress feedback during generation
 - Support resumption of interrupted operations
 - Generate navigable output with hyperlinked table of contents
-- Use consistent, logical naming for easy file location
+- Use consistent, logical naming for easy file location (Dewey Decimal-style prefixes)
 
 ## 3. System Features Overview
 
 ### 3.1. Intelligent Caching
 
-The system uses a SQLite database (`prerendered/cache.sqlite`) in Write-Ahead Logging (WAL) mode to provide intelligent caching capabilities:
+The system uses a SQLite database (`${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite`) in Write-Ahead Logging (WAL) mode to provide intelligent caching capabilities:
 
 **Core Capabilities**:
+
 - **Hash-based change detection**: Only regenerate PDFs when source content changes
 - **Dependency tracking**: Automatically regenerate PDFs when included files change
 - **Resume-on-failure**: Continue from last successful point if interrupted
@@ -66,6 +71,7 @@ The system uses a SQLite database (`prerendered/cache.sqlite`) in Write-Ahead Lo
 The system leverages multi-core processors to build multiple PDFs simultaneously:
 
 **Benefits**:
+
 - Dramatic reduction in initial build time
 - Scales automatically with available CPU cores
 - Each directory is processed as independent task
@@ -78,6 +84,7 @@ The system leverages multi-core processors to build multiple PDFs simultaneously
 The system automatically detects and uses available Pandoc filters for enhanced document processing:
 
 **Supported Filters**:
+
 - **Diagram rendering**: PlantUML, Mermaid, DBML
 - **Cross-referencing**: Figure numbering (fignos), table numbering (tablenos), section numbering (secnos)
 - **Content inclusion**: Include external files, advanced image handling (imagine)
@@ -86,14 +93,16 @@ The system automatically detects and uses available Pandoc filters for enhanced 
 
 ### 3.4. Dewey Decimal Naming
 
-All PDFs are stored in a flat directory with hierarchical Dewey Decimal-style prefixes:
+All generated outputs are stored within the run directory with hierarchical Dewey Decimal-style prefixes:
 
 **Naming Algorithm**:
+
 - Top-level directories: Base numbers (100, 200, 300)
 - Sub-directories: Inherit parent prefix + unique sub-number (100.010, 100.020)
-- Format: `[Prefix]-[Directory-Name].pdf`
+- Format: `[Prefix]-[Directory-Name].[ext]` (where extension matches output type)
 
-**Example**:
+**Example** (within `${TARGET_DIR}/.pndcgn/pdf-${RUN_ID}/`):
+
 ```log
 100-laravel.pdf
 100.010-tad.pdf
@@ -102,37 +111,55 @@ All PDFs are stored in a flat directory with hierarchical Dewey Decimal-style pr
 200.010-Documentation.pdf
 ```
 
-**Benefits**: Logical sorting, easy file location, reflects project hierarchy in flat structure.
+**Benefits**: Logical sorting, easy file location, reflects project hierarchy within the run directory structure.
 
-### 3.5. Run Management
+### 3.5. Interactive Source Selection (fzf)
+
+The system optionally integrates with `fzf` (fuzzy finder) to provide an interactive folder selection interface:
+
+**Core Capabilities**:
+- **Optional integration**: If `fzf` is installed and available, and no source directory is specified, the tool offers an interactive folder selection interface
+- **Directory-only display**: Only directories (folders) are shown in the selection interface, not individual files
+- **Graceful fallback**: If `fzf` is not installed or unavailable, the tool silently falls back to using the current working directory as the default source
+- **Non-blocking**: The integration is completely optional and does not affect normal operation if `fzf` is unavailable
+
+**Use Case**: Particularly useful when working in large project directories where you want to quickly select a specific subdirectory without typing the full path.
+
+### 3.6. Run Management
 
 Each execution is tracked with a unique ULID (Universally Unique Lexicographically Sortable Identifier):
 
 **Run Tracking**:
-- ULID format for unique run identification
+
+- ULID format for unique run identification (auto-generated by SQLite `ulid()` function from `sqlite-ulid` extension)
+- Extension automatically downloaded and installed on first run
 - Status tracking: in_progress, completed, aborted
 - Checkpoint-based resumption support
 - Clean specific runs or drop all outputs
 
 **Commands**:
-- `--resume`: Continue interrupted run
-- `--clean RUN_ID [RUN_ID...]`: Remove specific run outputs (requires confirmation)
-- `--drop`: Clear all output artefacts and cache (requires confirmation)
 
-### 3.6. Statistics and Reporting
+- `--resume <RUN_ID>`: Continue interrupted run
+- `--finalize <RUN_ID>`: Finalize a previous dry-run (if inputs unchanged)
+- `--dry-run`: Preview what would be generated without creating outputs
+- `--reseed`: Explicitly re-seed `.pndcgnignore` from current ignore rules
+
+### 3.7. Statistics and Reporting
 
 Comprehensive statistics tracking for each run:
 
 **Tracked Metrics**:
+
 - Directories processed vs. skipped
 - Files by type and extension
 - Processing timings and duration
 - Cache efficiency (hit/miss ratio)
 
-**Output**: Rich `_index.md` with:
+**Output**: Rich `_index.md` within the run directory with:
+
 - Mermaid visual mapping diagram of project structure
-- Hyperlinked list of all generated PDFs (sorted by Dewey Decimal prefix)
-- Statistics report for most recent run
+- Hyperlinked list of all generated outputs (sorted by Dewey Decimal prefix)
+- Statistics report for the run
 
 ## 4. Design Philosophy
 
@@ -176,6 +203,7 @@ Built for real-world use:
 ## 5. Prerequisites Summary
 
 **Core Requirements**:
+
 - Pandoc (document conversion engine)
 - LaTeX engine (TeX Live scheme-medium recommended)
 - SQLite (caching database)
@@ -184,9 +212,11 @@ Built for real-world use:
 - Python 3 with uv (for pip-based Pandoc filters)
 
 **Testing**:
+
 - shellspec (BDD/TDD framework for shell scripts)
 
 **Platform Support**:
+
 - IDX (Google): Managed via `dev.nix` configuration
 - macOS: Homebrew installation
 - Linux: APT/package manager installation
@@ -196,23 +226,27 @@ For detailed installation instructions, see [030-installation.md](030-installati
 ## 6. Quick Start
 
 **First Time Setup**:
+
 1. Install prerequisites (see [030-installation.md](030-installation.md))
-2. Run `generate-pdfs.sh --help` to see available options
-3. Execute `generate-pdfs.sh` for first generation
-4. Review `prerendered/pdf/_index.md` for generated documentation
+2. Run `pndcgn --help` to see available options
+3. Execute `pndcgn` for first generation (defaults to current directory)
+4. Review `${TARGET_DIR}/.pndcgn/pdf-${RUN_ID}/_index.md` for generated documentation
 
 **Subsequent Runs**:
-- `generate-pdfs.sh` - Incremental update (uses cache)
-- `generate-pdfs.sh --force` - Force full regeneration
-- `generate-pdfs.sh --dry-run` - Preview what would be generated
+
+- `pndcgn` - Incremental update (uses cache)
+- `pndcgn --force` - Force full regeneration
+- `pndcgn --dry-run` - Preview what would be generated
+- `pndcgn --finalize <RUN_ID>` - Finalize a previous dry-run
 
 **Understanding Output**:
-- PDFs are in `prerendered/pdf/` with Dewey Decimal naming
-- `_index.md` provides visual map and hyperlinked navigation
+
+- Outputs are in `${TARGET_DIR}/.pndcgn/${TYPE}-${RUN_ID}/` with Dewey Decimal naming
+- `_index.md` within the run directory provides visual map and hyperlinked navigation
 - Progress indicators show real-time processing status
 
 For comprehensive usage information, see [040-user-guide.md](040-user-guide.md).
 
 ## 7. Navigation
 
-[← Index](000-index.md) | [↑ Top](#pdf-generator-overview) | [Next: Requirements →](020-requirements.md)
+[← Index](000-index.md) | [↑ Top](#pndcgn-overview) | [Next: Requirements →](020-requirements.md)

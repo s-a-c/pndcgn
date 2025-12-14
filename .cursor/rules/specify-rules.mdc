@@ -1,0 +1,33 @@
+# pndcgn Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-12-14
+
+## Active Technologies
+- Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) + curl (for extension download) (001-sync-docs-spec)
+- SQLite (persistent state/cache) with WAL mode (001-sync-docs-spec)
+
+- Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) (001-sync-docs-spec)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+# Add commands for Bash (strict mode: `set -euo pipefail`)
+
+## Code Style
+
+Bash (strict mode: `set -euo pipefail`): Follow standard conventions
+
+## Recent Changes
+- 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) + curl (for extension download)
+- 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) + curl (for extension download)
+
+- 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test)
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

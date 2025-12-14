@@ -35,48 +35,57 @@
 
 ---
 
-**Compliant with**: AI-GUIDELINES.md v1.0
+Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
 ## 1. Quick Start
 
 ### 1.1. Basic Usage
 
-**Generate PDFs from markdown files**:
+**Generate documentation outputs from markdown files**:
 ```bash
-# Generate PDFs for all markdown files in current directory
-pdf-generator .
+# Generate PDFs for all markdown files in current directory (default)
+pndcgn
 
-# Generate PDFs for specific directory
-pdf-generator /path/to/markdown/files
+# Generate PDFs for specific source directory
+pndcgn /path/to/markdown/files
+
+# Generate with specific target directory
+pndcgn /path/to/source /path/to/target
 
 # Generate with verbose output
-pdf-generator --verbose /path/to/markdown/files
+pndcgn --verbose /path/to/markdown/files
 ```
 
 **Output location**:
 ```bash
-# Output goes to ./pndcgn/pdf-{RUN_ID}/
-ls pndcgn/pdf-*/
+# Output goes to ${TARGET_DIR}/.pndcgn/pdf-{RUN_ID}/
+ls .pndcgn/pdf-*/
 # file1.pdf  file2.pdf  file3.pdf
 ```
 
 ### 1.2. Common Options
 
 ```bash
-# Dry-run (no actual PDFs created)
-pdf-generator --dry-run source_dir
+# Dry-run (no actual outputs created)
+pndcgn --dry-run source_dir
 
 # Different output format
-pdf-generator --type epub source_dir
+pndcgn --type epub source_dir
 
 # Custom output directory
-pdf-generator source_dir /custom/output/path
+pndcgn source_dir /custom/output/path
 
 # Force regeneration (ignore cache)
-pdf-generator --force source_dir
+pndcgn --force source_dir
 
 # Resume interrupted run
-pdf-generator --resume {RUN_ID}
+pndcgn --resume {RUN_ID}
+
+# Finalize a previous dry-run
+pndcgn --finalize {RUN_ID}
+
+# Re-seed .pndcgnignore from current ignore rules
+pndcgn --reseed source_dir
 ```
 
 ---
@@ -86,41 +95,42 @@ pdf-generator --resume {RUN_ID}
 ### 2.1. Synopsis
 
 ```bash
-pdf-generator [OPTIONS] [SOURCE_DIR] [TARGET_DIR]
+pndcgn [OPTIONS] [SOURCE_DIR] [TARGET_DIR]
 ```
 
 **Description**:
-Batch convert markdown files to PDFs (or other formats) using pandoc, with intelligent caching via SQLite and support for resumable runs.
+Batch convert markdown files to documentation outputs (PDF, HTML, EPUB, and more) using pandoc, with intelligent caching via SQLite and support for resumable runs.
 
 ### 2.2. Arguments
 
 **SOURCE_DIR** (optional, default: `.`):
 - Directory containing source markdown files
-- Scanned recursively for `.md` files
+- Scanned recursively for eligible files (configurable via include/exclude patterns)
 - Can be absolute or relative path
+- **Interactive selection with fzf**: If `fzf` is installed and SOURCE_DIR is not provided, an interactive folder selection interface is offered, displaying only directories (folders) from the current working directory and its subdirectories. If `fzf` is unavailable or the selection is cancelled, the tool falls back to using the current working directory.
 
 ```bash
-# Current directory
-pdf-generator
+# Current directory (or interactive fzf selection if fzf installed)
+pndcgn
 
-# Specific directory
-pdf-generator ~/Documents/notes
+# Specific directory (bypasses fzf selection)
+pndcgn ~/Documents/notes
 
-# Absolute path
-pdf-generator /var/data/markdown
+# Absolute path (bypasses fzf selection)
+pndcgn /var/data/markdown
 ```
 
 **TARGET_DIR** (optional, default: `$PWD`):
 - Parent directory for output
-- Output created at `${TARGET_DIR}/pndcgn/${TYPE}-${RUN_ID}/`
+- Output created at `${TARGET_DIR}/.pndcgn/${TYPE}-${RUN_ID}/`
 - Must be writable
 
 ```bash
 # Output to current directory (default)
-pdf-generator source_dir
+pndcgn source_dir
 
 # Output to specific location
-pdf-generator source_dir /tmp/output
+pndcgn source_dir /tmp/output
 ```
 
 ### 2.3. Options
@@ -129,11 +139,11 @@ pdf-generator source_dir /tmp/output
 
 `--init`
 - Initialize configuration and database schema
-- Creates `pdf-generator.toml` if missing
+- Creates `pndcgn.toml` (or config file name TBD) if missing
 - Sets up SQLite tables
 
 ```bash
-pdf-generator --init
+pndcgn --init
 ```
 
 **Output Control**:
@@ -144,8 +154,8 @@ pdf-generator --init
 - Changes output directory name
 
 ```bash
-pdf-generator --type epub source_dir
-pdf-generator --type html source_dir
+pndcgn --type epub source_dir
+pndcgn --type html source_dir
 ```
 
 **Run Management**:
@@ -157,28 +167,40 @@ pdf-generator --type html source_dir
 
 ```bash
 # Preview processing
-pdf-generator --dry-run source_dir
+pndcgn --dry-run source_dir
 # Output: Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 ```
 
 `--finalize <RUN_ID>`
 - Complete a previous dry-run
-- Uses cached fingerprints
-- Only processes files that haven't changed
+- Validates fingerprints to ensure inputs/config unchanged
+- Only proceeds if fingerprint matches dry-run
+- Fails with actionable message if inputs changed
 
 ```bash
 # After dry-run, finalize the run
-pdf-generator --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 ```
 
 `--resume <RUN_ID>`
 - Resume interrupted run
 - Skips already-processed files
 - Uses existing output directory
+- Validates fingerprints before resuming
 
 ```bash
 # Resume after interruption
-pdf-generator --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+```
+
+`--reseed`
+- Explicitly re-seed `.pndcgnignore` from current ignore rules
+- Never automatic (only on explicit user action)
+- **Note**: Reseeding can change the effective input set and may invalidate fingerprints used for `--finalize` and `--resume` validation
+
+```bash
+# Re-seed .pndcgnignore from current .gitignore rules
+pndcgn --reseed source_dir
 ```
 
 **Cache Control**:
@@ -189,7 +211,7 @@ pdf-generator --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 - Useful after pandoc updates
 
 ```bash
-pdf-generator --force source_dir
+pndcgn --force source_dir
 ```
 
 `--clean`
@@ -198,7 +220,7 @@ pdf-generator --force source_dir
 - Frees disk space
 
 ```bash
-pdf-generator --clean
+pndcgn --clean
 ```
 
 `--drop`
@@ -207,7 +229,7 @@ pdf-generator --clean
 - Requires confirmation
 
 ```bash
-pdf-generator --drop
+pndcgn --drop
 ```
 
 **Output Control**:
@@ -218,7 +240,7 @@ pdf-generator --drop
 - Include timing information
 
 ```bash
-pdf-generator --verbose source_dir
+pndcgn --verbose source_dir
 ```
 
 `--help`
@@ -227,14 +249,14 @@ pdf-generator --verbose source_dir
 - Include examples
 
 ```bash
-pdf-generator --help
+pndcgn --help
 ```
 
 `--version`
 - Display version information
 
 ```bash
-pdf-generator --version
+pndcgn --version
 # pndcgn v6
 ```
 
@@ -247,23 +269,23 @@ pdf-generator --version
 **Process all markdown in directory**:
 ```bash
 # Basic usage
-pdf-generator ~/Documents/notes
+pndcgn ~/Documents/notes
 
 # Output structure
-ls ~/Documents/notes/pndcgn/pdf-*/
+ls ~/Documents/notes/.pndcgn/pdf-*/
 # note1.pdf  note2.pdf  note3.pdf
 ```
 
 **With options**:
 ```bash
 # Verbose output
-pdf-generator --verbose ~/Documents/notes
+pndcgn --verbose ~/Documents/notes
 
 # Different format
-pdf-generator --type epub ~/Documents/notes
+pndcgn --type epub ~/Documents/notes
 
 # Force regeneration
-pdf-generator --force ~/Documents/notes
+pndcgn --force ~/Documents/notes
 ```
 
 ### 3.2. Multiple Directories
@@ -271,11 +293,11 @@ pdf-generator --force ~/Documents/notes
 **Process multiple directories separately**:
 ```bash
 # First directory
-pdf-generator ~/notes
+pndcgn ~/notes
 # Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 
 # Second directory (different run)
-pdf-generator ~/docs
+pndcgn ~/docs
 # Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FH0
 ```
 
@@ -284,7 +306,7 @@ pdf-generator ~/docs
 # Process multiple directories
 for dir in ~/notes ~/docs ~/articles; do
     printf "Processing %s...\\n" "${dir}"
-    pdf-generator "${dir}"
+    pndcgn "${dir}"
 done
 ```
 
@@ -293,7 +315,7 @@ done
 **Preview before processing**:
 ```bash
 # Step 1: Dry-run to see what would be processed
-pdf-generator --dry-run ~/large-collection
+pndcgn --dry-run ~/large-collection
 # Output:
 # Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # Would process:
@@ -301,8 +323,8 @@ pdf-generator --dry-run ~/large-collection
 #   file2.md → file2.pdf
 #   (123 files total)
 
-# Step 2: Review the list, then finalize
-pdf-generator --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+# Step 2: Review the list, then finalize (if inputs unchanged)
+pndcgn --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # Processing...
 # Complete: 123 PDFs generated
 ```
@@ -317,31 +339,31 @@ pdf-generator --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 **Generate multiple formats**:
 ```bash
 # PDFs (default)
-pdf-generator source_dir
-# Output: pndcgn/pdf-{RUN_ID}/
+pndcgn source_dir
+# Output: .pndcgn/pdf-{RUN_ID}/
 
 # EPUBs
-pdf-generator --type epub source_dir
-# Output: pndcgn/epub-{RUN_ID}/
+pndcgn --type epub source_dir
+# Output: .pndcgn/epub-{RUN_ID}/
 
 # HTML
-pdf-generator --type html source_dir
-# Output: pndcgn/html-{RUN_ID}/
+pndcgn --type html source_dir
+# Output: .pndcgn/html-{RUN_ID}/
 
 # DOCX
-pdf-generator --type docx source_dir
-# Output: pndcgn/docx-{RUN_ID}/
+pndcgn --type docx source_dir
+# Output: .pndcgn/docx-{RUN_ID}/
 ```
 
 **Custom output location**:
 ```bash
 # PDFs to /tmp
-pdf-generator source_dir /tmp
-# Output: /tmp/pndcgn/pdf-{RUN_ID}/
+pndcgn source_dir /tmp
+# Output: /tmp/.pndcgn/pdf-{RUN_ID}/
 
 # EPUBs to network drive
-pdf-generator --type epub source_dir /mnt/network
-# Output: /mnt/network/pndcgn/epub-{RUN_ID}/
+pndcgn --type epub source_dir /mnt/network
+# Output: /mnt/network/.pndcgn/epub-{RUN_ID}/
 ```
 
 ---
@@ -353,6 +375,7 @@ pdf-generator --type epub source_dir /mnt/network
 **What is a Run ID?**
 - Unique identifier for each processing run
 - Format: ULID (Universally Unique Lexicographically Sortable Identifier)
+- Auto-generated by SQLite `ulid()` function from `sqlite-ulid` extension
 - Example: `01HN7XJKQM3R8Y2VWSDP4T6FGZ`
 
 **Properties**:
@@ -363,14 +386,14 @@ pdf-generator --type epub source_dir /mnt/network
 **Usage**:
 ```bash
 # Run ID shown at start
-pdf-generator source_dir
+pndcgn source_dir
 # Starting run: 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 
 # Use for resume
-pdf-generator --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 
 # Use for finalize
-pdf-generator --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 ```
 
 ### 4.2. Resuming Runs
@@ -386,7 +409,7 @@ pdf-generator --finalize 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # (shown in original output, or query database)
 
 # Step 2: Resume
-pdf-generator --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # Resuming run 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # Already processed: 45 files
 # Remaining: 78 files
@@ -403,14 +426,14 @@ pdf-generator --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 **Remove old cache entries**:
 ```bash
 # Clean completed runs (keeps schema)
-pdf-generator --clean
+pndcgn --clean
 # Removed 15 completed runs from cache
 ```
 
 **Drop entire database**:
 ```bash
 # Nuclear option (use with caution)
-pdf-generator --drop
+pndcgn --drop
 # WARNING: This will delete all cache data!
 # Continue? (y/N) y
 # Database dropped and recreated
@@ -419,10 +442,10 @@ pdf-generator --drop
 **Manual cleanup**:
 ```bash
 # Remove specific run's output
-rm -rf pndcgn/pdf-01HN7XJKQM3R8Y2VWSDP4T6FGZ/
+rm -rf .pndcgn/pdf-01HN7XJKQM3R8Y2VWSDP4T6FGZ/
 
 # Remove all output
-rm -rf pndcgn/
+rm -rf .pndcgn/
 
 # Remove database manually
 rm -f "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite"
@@ -432,7 +455,40 @@ rm -f "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite"
 
 ## 5. Advanced Features
 
-### 5.1. Caching and Fingerprinting
+### 5.1. Ignore Configuration (.pndcgnignore)
+
+**Purpose**: The `.pndcgnignore` file controls which paths under the source directory root should be excluded from discovery and processing.
+
+**Location**: `.pndcgnignore` is stored at the **source directory root** (the directory passed as `SOURCE_DIR`).
+
+**Format**: Gitignore-style patterns (glob-like matching), interpreted relative to the source root.
+
+**Auto-creation**: On the first non-help run, if `.pndcgnignore` does not exist:
+- The tool automatically creates it
+- Seeds it from applicable `.gitignore` rules using closest-first stacking (matching git's ignore behavior)
+- If no applicable `.gitignore` rules exist, seeds from a built-in default
+- Default content includes `.pndcgn` so generated outputs are ignored by default
+
+**Updates**: After creation, `.pndcgnignore` is **never automatically modified**, even if `.gitignore` changes. To update it:
+- Use the explicit `--reseed` action to regenerate from current ignore rules
+- Manually edit the file
+
+**Example**:
+```bash
+# First run: .pndcgnignore auto-created from .gitignore
+pndcgn source_dir
+# .pndcgnignore created at source_dir/.pndcgnignore
+
+# Later: manually edit if needed
+vim source_dir/.pndcgnignore
+
+# Or: re-seed from current .gitignore rules
+pndcgn --reseed source_dir
+```
+
+**Important**: Reseeding can change the effective input set and may invalidate fingerprints used for `--finalize` and `--resume` validation. If reseed occurs between dry-run and finalize, the tool will detect the mismatch and fail safely with an actionable message.
+
+### 5.2. Caching and Fingerprinting
 
 **How caching works**:
 1. Before processing, compute fingerprint of source file
@@ -448,7 +504,7 @@ rm -f "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite"
 **Force cache bypass**:
 ```bash
 # Regenerate all files
-pdf-generator --force source_dir
+pndcgn --force source_dir
 ```
 
 **Cache benefits**:
@@ -456,7 +512,7 @@ pdf-generator --force source_dir
 - Fast incremental updates
 - Avoids redundant processing
 
-### 5.2. Parallel Processing
+### 5.3. Parallel Processing
 
 **Default behavior**:
 - Tool processes files sequentially by default
@@ -470,10 +526,10 @@ pdf-generator --force source_dir
 **Future enhancements**:
 ```bash
 # Planned (not yet implemented)
-pdf-generator --jobs 4 source_dir
+pndcgn --jobs 4 source_dir
 ```
 
-### 5.3. Statistics and Reporting
+### 5.4. Statistics and Reporting
 
 **Run statistics** (stored in database):
 - Start time
@@ -490,13 +546,13 @@ sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" \
 
 # Count processed files for run
 sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" \
-    "SELECT COUNT(*) FROM generated_pdfs WHERE run_id = '01HN7XJKQM3R8Y2VWSDP4T6FGZ';"
+    "SELECT COUNT(*) FROM generated_artifacts WHERE run_id = '01HN7XJKQM3R8Y2VWSDP4T6FGZ';"
 ```
 
 **Future reporting features**:
 ```bash
 # Planned (not yet implemented)
-pdf-generator --stats 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --stats 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 ```
 
 ---
@@ -509,23 +565,23 @@ pdf-generator --stats 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 ```bash
 # Source: ~/notes/ with markdown files
 cd ~/notes
-pdf-generator .
+pndcgn .
 
-# Output: ~/notes/pndcgn/pdf-{RUN_ID}/
+# Output: ~/notes/.pndcgn/pdf-{RUN_ID}/
 ```
 
 **Example 2: Generate EPUBs for e-reader**:
 ```bash
 # Convert markdown books to EPUB
-pdf-generator --type epub ~/books/markdown
+pndcgn --type epub ~/books/markdown
 ```
 
 **Example 3: Preview large batch**:
 ```bash
 # Dry-run first
-pdf-generator --dry-run ~/archive/docs
+pndcgn --dry-run ~/archive/docs
 # Review output, then finalize
-pdf-generator --finalize {RUN_ID}
+pndcgn --finalize {RUN_ID}
 ```
 
 ### 6.2. Advanced Examples
@@ -533,39 +589,39 @@ pdf-generator --finalize {RUN_ID}
 **Example 4: Incremental updates**:
 ```bash
 # First run: process all files
-pdf-generator ~/project/docs
+pndcgn ~/project/docs
 # 250 files processed
 
 # Edit a few files...
 vim ~/project/docs/chapter1.md
 
 # Second run: only process changed files
-pdf-generator ~/project/docs
+pndcgn ~/project/docs
 # 1 file processed, 249 skipped (cached)
 ```
 
 **Example 5: Multiple formats from same source**:
 ```bash
 # Generate PDFs
-pdf-generator ~/manuscript
+pndcgn ~/manuscript
 
 # Generate EPUBs (using cache)
-pdf-generator --type epub ~/manuscript
+pndcgn --type epub ~/manuscript
 
 # Generate HTML (using cache)
-pdf-generator --type html ~/manuscript
+pndcgn --type html ~/manuscript
 ```
 
 **Example 6: Network mount with resume**:
 ```bash
 # Start processing on network mount
-pdf-generator /mnt/nas/docs /mnt/nas/output
+pndcgn /mnt/nas/docs /mnt/nas/output
 # Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # Processing...
 # ^C (interrupted due to network issue)
 
 # Fix network, then resume
-pdf-generator --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
+pndcgn --resume 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 # Continuing...
 ```
 
@@ -582,13 +638,13 @@ projects=(
 
 for project in "${projects[@]}"; do
     printf "Processing: %s\\n" "${project}"
-    
+
     # Generate PDFs
-    pdf-generator "${project}"
-    
+    pndcgn "${project}"
+
     # Generate EPUBs
-    pdf-generator --type epub "${project}"
-    
+    pndcgn --type epub "${project}"
+
     printf "\\n"
 done
 
@@ -622,7 +678,7 @@ sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" \
 # Solution: Change target or fix permissions
 chmod u+w target_dir
 # Or specify different target
-pdf-generator source_dir /tmp
+pndcgn source_dir /tmp
 ```
 
 **Error: "Pandoc conversion failed"**
@@ -641,7 +697,7 @@ pandoc problem.md -o test.pdf
 find source_dir -name "*.md" | wc -l
 
 # Use verbose mode to identify bottlenecks
-pdf-generator --verbose source_dir
+pndcgn --verbose source_dir
 ```
 
 **Issue: Large cache database**
@@ -650,7 +706,7 @@ pdf-generator --verbose source_dir
 du -h "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite"
 
 # Clean old runs
-pdf-generator --clean
+pndcgn --clean
 
 # Vacuum database
 sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" "VACUUM;"
@@ -662,10 +718,10 @@ sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" "VACUUM;"
 df -h .
 
 # Remove old output directories
-rm -rf pndcgn/pdf-{old-run-id}/
+rm -rf .pndcgn/pdf-{old-run-id}/
 
 # Or specify target on different mount
-pdf-generator source_dir /mnt/large-disk
+pndcgn source_dir /mnt/large-disk
 ```
 
 ---

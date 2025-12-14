@@ -33,7 +33,7 @@
 
 ---
 
-**Compliant with**: AI-GUIDELINES.md v1.0
+Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
 ## 1. Overview
 
@@ -62,7 +62,7 @@
 **Format specification**:
 ```bash
 # Via command-line
-pdf-generator --type <format> source_dir
+pndcgn --type <format> source_dir
 
 # Pandoc invocation
 pandoc --from markdown --to <format> --output file.<ext> source.md

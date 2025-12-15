@@ -12,13 +12,13 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## CLI Accessibility Requirements
 
-- [ ] CHK001 - Are CLI accessibility requirements defined for screen reader compatibility? [Accessibility, Gap]
+- [X] CHK001 - Are CLI accessibility requirements defined for screen reader compatibility? [Accessibility, Gap] ✅ Implemented: pndcgn_is_screen_reader() and structured output (T178)
 - [ ] CHK002 - Are CLI accessibility requirements defined for keyboard navigation (CLI is keyboard-only)? [Accessibility, Gap]
 - [ ] CHK003 - Are CLI accessibility requirements defined for clear, readable text output? [Accessibility, Spec §FR-015, Gap]
 - [ ] CHK004 - Are CLI accessibility requirements defined for error message accessibility (screen reader friendly)? [Accessibility, Spec §FR-015, Gap]
 - [ ] CHK005 - Are CLI accessibility requirements defined for help text accessibility? [Accessibility, Spec §FR-017, Gap]
 - [ ] CHK006 - Are CLI accessibility requirements defined for progress indicator accessibility? [Accessibility, Constitution §Output Standards, Gap]
-- [ ] CHK007 - Are CLI accessibility requirements defined for color-coded message accessibility (not color-dependent)? [Accessibility, Constitution §Output Standards, Gap]
+- [X] CHK007 - Are CLI accessibility requirements defined for color-coded message accessibility (not color-dependent)? [Accessibility, Constitution §Output Standards, Gap] ✅ Implemented: Colorblind-friendly colors (blue/yellow) and text labels (T179)
 - [ ] CHK008 - Are CLI accessibility requirements defined for output format accessibility (text-based, not binary-only)? [Accessibility, Gap]
 
 ---
@@ -125,7 +125,7 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 - [ ] CHK065 - Are accessibility requirements aligned with CLI accessibility best practices? [Accessibility Standards, Gap]
 - [ ] CHK066 - Are accessibility requirements aligned with output format accessibility standards (PDF accessibility)? [Accessibility Standards, Gap]
 - [ ] CHK067 - Are accessibility requirements aligned with keyboard navigation standards? [Accessibility Standards, Gap]
-- [ ] CHK068 - Are accessibility requirements aligned with screen reader compatibility standards? [Accessibility Standards, Gap]
+- [X] CHK068 - Are accessibility requirements aligned with screen reader compatibility standards? [Accessibility Standards, Gap] ✅ Implemented: Screen reader detection and structured output (T178)
 
 ---
 

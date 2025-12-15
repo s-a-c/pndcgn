@@ -109,7 +109,7 @@ All generated outputs are stored within the run directory with hierarchical Dewe
 100.800-documentation-suite.pdf
 200-AI-GUIDELINES.pdf
 200.010-Documentation.pdf
-```
+```text
 
 **Benefits**: Logical sorting, easy file location, reflects project hierarchy within the run directory structure.
 

@@ -12,19 +12,19 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## Test-First Development Requirements
 
-- [ ] CHK001 - Is the test-first development requirement (tests written before implementation) clearly documented? [Completeness, Constitution §II]
-- [ ] CHK002 - Is the red-green-refactor cycle requirement clearly specified? [Completeness, Constitution §II]
-- [ ] CHK003 - Is the prohibition against implementation without failing tests documented? [Completeness, Constitution §II]
-- [ ] CHK004 - Is the test-first workflow clearly defined (tests written → user approved → tests fail → then implement)? [Clarity, Constitution §II]
-- [ ] CHK005 - Are test-first requirements consistent between constitution and plan? [Consistency, Constitution §II vs Plan §Constitution Check]
-- [ ] CHK006 - Is test-first development explicitly required for this feature? [Completeness, Plan §Constitution Check, Gap]
+- [X] CHK001 - Is the test-first development requirement (tests written before implementation) clearly documented? [Completeness, Constitution §II] ✅ Documented in constitution.md §II
+- [X] CHK002 - Is the red-green-refactor cycle requirement clearly specified? [Completeness, Constitution §II] ✅ Documented: "Red-Green-Refactor cycle strictly enforced"
+- [X] CHK003 - Is the prohibition against implementation without failing tests documented? [Completeness, Constitution §II] ✅ Documented: "Prohibition: No implementation without corresponding failing test first"
+- [X] CHK004 - Is the test-first workflow clearly defined (tests written → user approved → tests fail → then implement)? [Clarity, Constitution §II] ✅ Documented: "Tests written → User approved → Tests fail → Then implement"
+- [X] CHK005 - Are test-first requirements consistent between constitution and plan? [Consistency, Constitution §II vs Plan §Constitution Check] ✅ Verified: Consistent across documents
+- [X] CHK006 - Is test-first development explicitly required for this feature? [Completeness, Plan §Constitution Check, Gap] ✅ Required: Constitution §II (NON-NEGOTIABLE)
 
 ---
 
 ## Test Framework Requirements
 
-- [ ] CHK007 - Is ShellSpec framework requirement clearly documented? [Completeness, Constitution §II, Plan §Technical Context]
-- [ ] CHK008 - Is ShellSpec requirement consistent across constitution and plan? [Consistency, Constitution §II vs Plan §Technical Context]
+- [X] CHK007 - Is ShellSpec framework requirement clearly documented? [Completeness, Constitution §II, Plan §Technical Context] ✅ Documented: "ShellSpec framework REQUIRED for all tests"
+- [X] CHK008 - Is ShellSpec requirement consistent across constitution and plan? [Consistency, Constitution §II vs Plan §Technical Context] ✅ Verified: Consistent, 29 test files use ShellSpec
 - [ ] CHK009 - Is the rationale for ShellSpec framework choice documented? [Clarity, Constitution §II, Gap]
 - [ ] CHK010 - Are test framework requirements clearly specified for all test categories (unit/integration/system)? [Completeness, Constitution §II, Gap]
 
@@ -53,9 +53,9 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## Test Category Requirements
 
-- [ ] CHK022 - Are unit test requirements clearly defined (test individual functions in isolation)? [Completeness, Constitution §II]
-- [ ] CHK023 - Are integration test requirements clearly defined (test component interactions)? [Completeness, Constitution §II]
-- [ ] CHK024 - Are system test requirements clearly defined (end-to-end BDD scenarios)? [Completeness, Constitution §II]
+- [X] CHK022 - Are unit test requirements clearly defined (test individual functions in isolation)? [Completeness, Constitution §II] ✅ Documented: "Unit tests: Test individual functions in isolation"
+- [X] CHK023 - Are integration test requirements clearly defined (test component interactions)? [Completeness, Constitution §II] ✅ Documented: "Integration tests: Test component interactions"
+- [X] CHK024 - Are system test requirements clearly defined (end-to-end BDD scenarios)? [Completeness, Constitution §II] ✅ Documented: "System tests: End-to-end BDD scenarios with Given-When-Then format"
 - [ ] CHK025 - Are test category boundaries clearly defined (what belongs in unit vs integration vs system)? [Clarity, Constitution §II, Gap]
 - [ ] CHK026 - Are test category requirements consistent with BDD scenarios in spec? [Consistency, Constitution §II vs Spec §User Scenarios]
 
@@ -75,7 +75,7 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## Test Execution Requirements
 
-- [ ] CHK034 - Is the requirement that tests MUST be executable with `bash` clearly documented? [Completeness, Constitution §II]
+- [X] CHK034 - Is the requirement that tests MUST be executable with `bash` clearly documented? [Completeness, Constitution §II] ✅ Documented: "Tests MUST be executable with `bash` (not dependent on user's shell configuration)"
 - [ ] CHK035 - Is the requirement that tests MUST be executable standalone clearly documented? [Completeness, Constitution §Testing Standards]
 - [ ] CHK036 - Is the prohibition against dependency on user's environment clearly specified? [Completeness, Constitution §Testing Standards]
 - [ ] CHK037 - Is the prohibition against dependency on user's shell configuration clearly specified? [Completeness, Constitution §Testing Standards]

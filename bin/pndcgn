@@ -1,0 +1,961 @@
+#!/usr/bin/env bash
+#
+# pndcgn - Documentation Generation Tool
+#
+# Compliant with [AGENTS.md](../AGENTS.md)
+#
+# Description: Generates organized documentation outputs from project sources
+# using pandoc with intelligent caching and resumable runs.
+
+set -euo pipefail
+
+# --- Source Modules ---
+# Get script directory and source modules
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Export PROJECT_ROOT for use in modules
+export PROJECT_ROOT
+
+# Source constants and utilities
+. "$PROJECT_ROOT/src/constants.sh"
+. "$PROJECT_ROOT/src/utilities.sh"
+. "$PROJECT_ROOT/src/database.sh"
+. "$PROJECT_ROOT/src/processing.sh"
+
+# --- Usage Function ---
+pndcgn_usage() {
+    cat <<EOF
+${BOLD}${PNDCGN_NAME}${RESET} - Documentation Generation Tool v${PNDCGN_VERSION}
+
+${BOLD}Usage:${RESET}
+    $0 [OPTIONS] [SOURCE_DIR] [TARGET_DIR]
+
+${BOLD}Arguments:${RESET}
+    SOURCE_DIR    Source directory (default: current directory)
+    TARGET_DIR    Target directory (default: current directory)
+
+${BOLD}Options:${RESET}
+    --type <TYPE>           Output type (default: ${PNDCGN_DEFAULT_OUTPUT_TYPE})
+    --dry-run               Preview mode; produces no output artifacts
+    --finalize <RUN_ID>     Finalize a prior dry-run if inputs/config unchanged
+    --resume <RUN_ID>       Resume an interrupted run
+    --force                 Bypass cache
+    --reseed                Re-seed .pndcgnignore from current ignore rules
+    --clean <RUN_ID>...     Remove outputs for specified run IDs
+    --drop                  Clear all cache/state
+    --yes                   Skip confirmation prompts (required in non-interactive mode)
+    -h, --help              Display this help message
+
+${BOLD}Examples:${RESET}
+    $0                          # Generate PDFs from current directory
+    $0 docs/ output/            # Generate from docs/ to output/
+    $0 --dry-run                # Preview what would be generated
+    $0 --finalize 01ARZ3NDEKTSV4Y5QH6J7K8M9  # Finalize a dry-run
+
+${BOLD}Exit Codes:${RESET}
+    0    Success
+    1    Runtime error
+    2    Invalid usage
+
+EOF
+}
+
+# --- Resume Handler ---
+pndcgn_handle_resume() {
+    local run_id="$1"
+    local source_dir="$2"
+    local target_dir="$3"
+    local output_type="$4"
+    local ignore_file="$5"
+    local force="$6"
+
+    pndcgn_log_info "Resuming run: $run_id"
+
+    # Verify run exists
+    if ! pndcgn_db_run_exists "$run_id"; then
+        pndcgn_log_error "Run not found: $run_id"
+        pndcgn_log_info "Use '$0' to list available runs"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    # Get run status
+    local run_status
+    run_status=$(pndcgn_db_get_run_status "$run_id")
+
+    # Check if run is resumable (NFR-CACHE-033-035)
+    case "$run_status" in
+        complete)
+            pndcgn_log_error "Run $run_id is already complete (status: $run_status)"
+            pndcgn_log_info "Cannot resume a completed run. Create a new run instead."
+            exit "${PNDCGN_EXIT_ERROR}"
+            ;;
+        failed)
+            pndcgn_log_error "Run $run_id failed (status: $run_status)"
+            pndcgn_log_info "Cannot resume a failed run. Create a new run instead."
+            exit "${PNDCGN_EXIT_ERROR}"
+            ;;
+    esac
+
+    if [[ "$run_status" != "running" ]] && [[ "$run_status" != "interrupted" ]] && [[ "$run_status" != "partial" ]]; then
+        pndcgn_log_error "Run $run_id is not resumable (status: $run_status)"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    # Validate fingerprint if not forcing
+    if [[ "$force" != "true" ]]; then
+        local stored_fingerprint
+        stored_fingerprint=$(pndcgn_db_get_fingerprint "$run_id" || printf "")
+
+        if [[ -n "$stored_fingerprint" ]]; then
+            local current_fingerprint
+            current_fingerprint=$(pndcgn_compute_run_fingerprint "$source_dir" "$ignore_file" "$output_type" "$target_dir")
+
+            if ! pndcgn_validate_fingerprint "$current_fingerprint" "$stored_fingerprint"; then
+                pndcgn_log_error "Fingerprint validation failed. Cannot resume run."
+                exit "${PNDCGN_EXIT_ERROR}"
+            fi
+        fi
+    fi
+
+    # Get already-processed files
+    local processed_files
+    mapfile -t processed_files < <(pndcgn_db_get_processed_files "$run_id")
+
+    # Update status to running
+    pndcgn_db_update_run_status "$run_id" "running"
+
+    # Create output directory
+    local output_dir
+    output_dir=$(pndcgn_create_output_directory "$target_dir" "$output_type" "$run_id")
+
+    # Discover files
+    pndcgn_log_info "Discovering files in: $source_dir"
+    local files
+    mapfile -t files < <(pndcgn_discover_files "$source_dir" "$ignore_file")
+    local total_files=${#files[@]}
+
+    pndcgn_log_info "Found $total_files files to process"
+
+    # Process files (skip already-processed)
+    local processed=0
+    local skipped=0
+    local failed=0
+    local start_time
+    start_time=$(date +%s)
+    local current_count=0
+
+    for file in "${files[@]}"; do
+        current_count=$((processed + skipped + failed + 1))
+
+        # Calculate and display ETA for long operations (NFR-CLI-033)
+        if [[ $total_files -gt 10 ]] && [[ $((current_count % 10)) -eq 0 ]]; then
+            local current_time
+            current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local eta
+            eta=$(pndcgn_calculate_eta "$current_count" "$total_files" "$elapsed")
+            if ! pndcgn_is_quiet; then
+                printf "\r${DIM}Progress: %d/%d (ETA: %s)${RESET}" "$current_count" "$total_files" "$eta" >&2
+            fi
+        fi
+        # Check if already processed
+        local already_processed=false
+        for processed_file in "${processed_files[@]}"; do
+            if [[ "$file" == "$processed_file" ]]; then
+                already_processed=true
+                break
+            fi
+        done
+
+        if [[ "$already_processed" == "true" ]]; then
+            skipped=$((skipped + 1))
+            pndcgn_log_info "Skipped (already processed): $file"
+            continue
+        fi
+
+        # Process file (same logic as normal run)
+        local input_fingerprint
+        input_fingerprint=$(pndcgn_compute_fingerprint "$file")
+
+        local cached_output=""
+        if [[ "$force" != "true" ]]; then
+            cached_output=$(pndcgn_db_check_cache "$file" "$input_fingerprint" "$output_type" || printf "")
+        fi
+
+        if [[ -n "$cached_output" ]] && [[ -f "$cached_output" ]]; then
+            skipped=$((skipped + 1))
+            pndcgn_log_info "Skipped (cached): $file"
+            continue
+        fi
+
+        local dewey_prefix
+        dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
+        local rel_path="${file#$source_dir/}"
+        local base_name=$(basename "$rel_path" .md)
+        base_name=$(basename "$base_name" .markdown)
+        local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
+
+        if pndcgn_convert_file "$file" "$output_file" "$output_type"; then
+            processed=$((processed + 1))
+
+            local output_fingerprint
+            output_fingerprint=$(pndcgn_compute_output_fingerprint "$output_dir")
+
+            local db_path
+            db_path=$(pndcgn_get_db_path)
+            sqlite3 "$db_path" <<EOF
+INSERT OR REPLACE INTO generated_artifacts
+    (run_id, source_path, output_path, input_fingerprint, output_fingerprint, size_bytes)
+VALUES
+    ('$run_id', '$file', '$output_file', '$input_fingerprint', '$output_fingerprint',
+     $(stat -f%z "$output_file" 2>/dev/null || stat -c%s "$output_file" 2>/dev/null || printf "0"));
+EOF
+
+            pndcgn_log_info "Processed: $file -> $output_file"
+        else
+            failed=$((failed + 1))
+            pndcgn_log_error "Failed to process: $file"
+        fi
+    done
+
+    # Update run status
+    local end_time
+    end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local db_path
+    db_path=$(pndcgn_get_db_path)
+    local counters_json="{\"total\":$total_files,\"processed\":$processed,\"skipped\":$skipped,\"failed\":$failed}"
+
+    sqlite3 "$db_path" <<EOF
+UPDATE runs
+SET status = 'complete',
+    completed_at = $end_time,
+    counters_json = '$counters_json'
+WHERE run_id = '$run_id';
+EOF
+
+    # Generate index
+    pndcgn_generate_index "$output_dir" "$run_id" "$counters_json"
+
+    # Print summary
+    if ! pndcgn_is_quiet; then
+        local formatted_duration
+        formatted_duration=$(pndcgn_format_duration "$duration")
+        local formatted_run_id
+        formatted_run_id=$(pndcgn_format_run_id "$run_id")
+
+        printf "\n${B_SUCCESS}✓${RESET} Resume complete: ${BOLD}%s${RESET}\n" "$formatted_run_id"
+        printf "  %-12s %-12s %-12s\n" "Processed: ${B_GREEN}${processed}${RESET}" "Skipped: ${B_YELLOW}${skipped}${RESET}" "Failed: ${B_RED}${failed}${RESET}"
+        printf "  Duration: %s\n" "$formatted_duration"
+        printf "  Output: %s\n" "$output_dir"
+    fi
+}
+
+# --- Clean Handler ---
+pndcgn_handle_clean() {
+    local yes_flag="$1"
+    shift
+    local run_ids=("$@")
+
+    # Check if confirmation is needed
+    if [[ "$yes_flag" != "true" ]]; then
+        # Check if interactive mode
+        if ! pndcgn_is_interactive; then
+            pndcgn_log_error "Non-interactive mode requires --yes flag for destructive operations"
+            exit "${PNDCGN_EXIT_USAGE}"
+        fi
+
+        pndcgn_log_warn "This will delete output directories for ${#run_ids[@]} run(s)"
+        printf "Are you sure? (yes/no): "
+        read -r confirmation
+
+        if [[ "$confirmation" != "yes" ]]; then
+            pndcgn_log_info "Clean cancelled"
+            exit "${PNDCGN_EXIT_SUCCESS}"
+        fi
+    fi
+
+    if ! pndcgn_is_quiet; then
+        pndcgn_log_info "Cleaning ${#run_ids[@]} run(s)"
+    fi
+
+    local cleaned_count=0
+    for run_id in "${run_ids[@]}"; do
+        # Verify run exists (NFR-CACHE-053)
+        if ! pndcgn_db_run_exists "$run_id"; then
+            pndcgn_log_error "Run not found: $run_id"
+            pndcgn_log_info "Use '$0' to list available runs"
+            continue
+        fi
+
+        # Check if run is active (NFR-EDGE-068)
+        local run_status
+        run_status=$(pndcgn_db_get_run_status "$run_id" 2>/dev/null || printf "")
+        if [[ "$run_status" == "running" ]]; then
+            pndcgn_log_error "Cannot clean active run: $run_id"
+            pndcgn_log_info "Wait for run to complete or interrupt it first"
+            continue
+        fi
+
+        # Get run details
+        local run_details
+        run_details=$(pndcgn_db_get_run "$run_id")
+
+        # Extract target_root and output_type (simplified - would need JSON parsing)
+        local db_path
+        db_path=$(pndcgn_get_db_path)
+        local target_root
+        local output_type
+        target_root=$(sqlite3 "$db_path" "SELECT target_root FROM runs WHERE run_id = '$run_id';")
+        output_type=$(sqlite3 "$db_path" "SELECT output_type FROM runs WHERE run_id = '$run_id';")
+
+        # Delete output directory
+        if pndcgn_delete_output_directory "$target_root" "$output_type" "$run_id"; then
+            # Delete from database
+            pndcgn_db_delete_run "$run_id"
+            pndcgn_log_info "Cleaned run: $run_id"
+        else
+            pndcgn_log_error "Failed to clean run: $run_id"
+        fi
+    done
+}
+
+# --- Drop Handler ---
+pndcgn_handle_drop() {
+    local yes_flag="${1:-false}"
+
+    # Check if confirmation is needed
+    if [[ "$yes_flag" != "true" ]]; then
+        # Check if interactive mode
+        if ! pndcgn_is_interactive; then
+            pndcgn_log_error "Non-interactive mode requires --yes flag for destructive operations"
+            exit "${PNDCGN_EXIT_USAGE}"
+        fi
+
+        pndcgn_log_warn "This will delete ALL runs and cache data!"
+        printf "Are you sure? (yes/no): "
+        read -r confirmation
+
+        if [[ "$confirmation" != "yes" ]]; then
+            pndcgn_log_info "Drop cancelled"
+            exit "${PNDCGN_EXIT_SUCCESS}"
+        fi
+    fi
+
+    # Clear database
+    pndcgn_db_drop_all
+
+    # Find and delete all .pndcgn directories
+    local deleted_count=0
+    while IFS= read -r -d '' pndcgn_dir; do
+        if rm -rf "$pndcgn_dir"; then
+            deleted_count=$((deleted_count + 1))
+        fi
+    done < <(find . -type d -name ".pndcgn" -print0 2>/dev/null)
+
+    if ! pndcgn_is_quiet; then
+        pndcgn_log_info "Dropped all runs and cache"
+        pndcgn_log_info "Deleted $deleted_count .pndcgn directory(ies)"
+    fi
+}
+
+# --- Finalize Handler ---
+pndcgn_handle_finalize() {
+    local run_id="$1"
+    local source_dir="$2"
+    local target_dir="$3"
+    local output_type="$4"
+    local ignore_file="$5"
+
+    pndcgn_log_info "Finalizing run: $run_id"
+
+    # Verify run exists
+    if ! pndcgn_db_run_exists "$run_id"; then
+        pndcgn_log_error "Run not found: $run_id"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    # Get stored fingerprint
+    local stored_fingerprint
+    stored_fingerprint=$(pndcgn_db_get_fingerprint "$run_id" || printf "")
+
+    # Compute current fingerprint (includes config file content - NFR-TOML-048-049)
+    local current_fingerprint
+    current_fingerprint=$(pndcgn_compute_run_fingerprint "$source_dir" "$ignore_file" "$output_type" "$target_dir")
+
+    if [[ -z "$stored_fingerprint" ]]; then
+        pndcgn_log_error "Run $run_id does not have a stored fingerprint (may not be a dry-run)"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    # Compute current fingerprint
+    pndcgn_log_info "Validating fingerprint..."
+    local current_fingerprint
+    current_fingerprint=$(pndcgn_compute_run_fingerprint "$source_dir" "$ignore_file" "$output_type" "$target_dir")
+
+    # Validate fingerprint (NFR-CACHE-043-044)
+    if ! pndcgn_validate_fingerprint "$current_fingerprint" "$stored_fingerprint"; then
+        pndcgn_log_error "Fingerprint validation failed. Cannot finalize run."
+        pndcgn_log_info "Source files or configuration have changed since dry-run"
+        pndcgn_log_info "Create a new run with: ${BOLD}$0${RESET}"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    pndcgn_log_info "Fingerprint validated. Proceeding with finalization..."
+
+    # Get run details
+    local run_details
+    run_details=$(pndcgn_db_get_run "$run_id")
+
+    # Create output directory
+    local output_dir
+    output_dir=$(pndcgn_create_output_directory "$target_dir" "$output_type" "$run_id")
+
+    # Discover files (same as dry-run)
+    pndcgn_log_info "Discovering files in: $source_dir"
+    local files
+    mapfile -t files < <(pndcgn_discover_files "$source_dir" "$ignore_file")
+    local total_files=${#files[@]}
+
+    pndcgn_log_info "Found $total_files files to process"
+
+    # Process files (same logic as normal run)
+    local processed=0
+    local skipped=0
+    local failed=0
+    local start_time
+    start_time=$(date +%s)
+
+    for file in "${files[@]}"; do
+        local input_fingerprint
+        input_fingerprint=$(pndcgn_compute_fingerprint "$file")
+
+        local cached_output=""
+        if [[ "$force" != "true" ]]; then
+            cached_output=$(pndcgn_db_check_cache "$file" "$input_fingerprint" "$output_type" || printf "")
+        fi
+
+        if [[ -n "$cached_output" ]] && [[ -f "$cached_output" ]]; then
+            skipped=$((skipped + 1))
+            pndcgn_log_info "Skipped (cached): $file"
+            continue
+        fi
+
+        local dewey_prefix
+        dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
+        local rel_path="${file#$source_dir/}"
+        local base_name=$(basename "$rel_path" .md)
+        base_name=$(basename "$base_name" .markdown)
+        local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
+
+        if pndcgn_convert_file "$file" "$output_file" "$output_type"; then
+            processed=$((processed + 1))
+
+            local output_fingerprint
+            output_fingerprint=$(pndcgn_compute_output_fingerprint "$output_dir")
+
+            local db_path
+            db_path=$(pndcgn_get_db_path)
+            sqlite3 "$db_path" <<EOF
+INSERT OR REPLACE INTO generated_artifacts
+    (run_id, source_path, output_path, input_fingerprint, output_fingerprint, size_bytes)
+VALUES
+    ('$run_id', '$file', '$output_file', '$input_fingerprint', '$output_fingerprint',
+     $(stat -f%z "$output_file" 2>/dev/null || stat -c%s "$output_file" 2>/dev/null || printf "0"));
+EOF
+
+            pndcgn_log_info "Processed: $file -> $output_file"
+        else
+            failed=$((failed + 1))
+            pndcgn_log_error "Failed to process: $file"
+        fi
+    done
+
+    # Update run status
+    local end_time
+    end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local db_path
+    db_path=$(pndcgn_get_db_path)
+    local counters_json="{\"total\":$total_files,\"processed\":$processed,\"skipped\":$skipped,\"failed\":$failed}"
+
+    sqlite3 "$db_path" <<EOF
+UPDATE runs
+SET status = 'complete',
+    completed_at = $end_time,
+    counters_json = '$counters_json',
+    dry_run = 0
+WHERE run_id = '$run_id';
+EOF
+
+    # Generate index
+    pndcgn_generate_index "$output_dir" "$run_id" "$counters_json"
+
+    # Print summary
+    if ! pndcgn_is_quiet; then
+        local formatted_duration
+        formatted_duration=$(pndcgn_format_duration "$duration")
+        local formatted_run_id
+        formatted_run_id=$(pndcgn_format_run_id "$run_id")
+
+        printf "\n${B_SUCCESS}✓${RESET} Finalization complete: ${BOLD}%s${RESET}\n" "$formatted_run_id"
+        printf "  %-12s %-12s %-12s\n" "Processed: ${B_GREEN}${processed}${RESET}" "Skipped: ${B_YELLOW}${skipped}${RESET}" "Failed: ${B_RED}${failed}${RESET}"
+        printf "  Duration: %s\n" "$formatted_duration"
+        printf "  Output: %s\n" "$output_dir"
+    fi
+}
+
+# --- Main Function ---
+pndcgn_main() {
+    local source_dir=""
+    local target_dir=""
+    local output_type="${PNDCGN_DEFAULT_OUTPUT_TYPE}"
+    local dry_run=false
+    local finalize_run_id=""
+    local resume_run_id=""
+    local force=false
+    local reseed=false
+    local clean_run_ids=()
+    local drop=false
+    local yes_flag=false
+    local verbose=false
+    local quiet=false
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                pndcgn_usage
+                exit "${PNDCGN_EXIT_SUCCESS}"
+                ;;
+            --version|-v)
+                printf "%s v%s\n" "${PNDCGN_NAME}" "${PNDCGN_VERSION}"
+                exit "${PNDCGN_EXIT_SUCCESS}"
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --quiet|-q)
+                quiet=true
+                shift
+                ;;
+            --type)
+                if [[ $# -lt 2 ]]; then
+                    printf "${B_RED}Error:${RESET} --type requires a value\n" >&2
+                    exit "${PNDCGN_EXIT_USAGE}"
+                fi
+                output_type="$2"
+                shift 2
+                ;;
+            --dry-run)
+                dry_run=true
+                shift
+                ;;
+            --finalize)
+                if [[ $# -lt 2 ]]; then
+                    printf "${B_RED}Error:${RESET} --finalize requires a RUN_ID\n" >&2
+                    exit "${PNDCGN_EXIT_USAGE}"
+                fi
+                finalize_run_id="$2"
+                shift 2
+                ;;
+            --resume)
+                if [[ $# -lt 2 ]]; then
+                    printf "${B_RED}Error:${RESET} --resume requires a RUN_ID\n" >&2
+                    exit "${PNDCGN_EXIT_USAGE}"
+                fi
+                resume_run_id="$2"
+                shift 2
+                ;;
+            --force)
+                force=true
+                shift
+                ;;
+            --reseed)
+                reseed=true
+                shift
+                ;;
+            --clean)
+                shift
+                while [[ $# -gt 0 ]] && [[ "$1" != --* ]]; do
+                    clean_run_ids+=("$1")
+                    shift
+                done
+                if [[ ${#clean_run_ids[@]} -eq 0 ]]; then
+                    printf "${B_RED}Error:${RESET} --clean requires at least one RUN_ID\n" >&2
+                    exit "${PNDCGN_EXIT_USAGE}"
+                fi
+                ;;
+            --drop)
+                drop=true
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                printf "${B_RED}Error:${RESET} Unknown option: $1\n" >&2
+                pndcgn_usage >&2
+                exit "${PNDCGN_EXIT_USAGE}"
+                ;;
+            *)
+                if [[ -z "$source_dir" ]]; then
+                    source_dir="$1"
+                elif [[ -z "$target_dir" ]]; then
+                    target_dir="$1"
+                else
+                    printf "${B_RED}Error:${RESET} Too many arguments\n" >&2
+                    pndcgn_usage >&2
+                    exit "${PNDCGN_EXIT_USAGE}"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Set defaults - use fzf for SOURCE_DIR if not provided
+    # Support stdin/pipe input (NFR-CLI-012: stdin input support)
+    if [[ -z "$source_dir" ]]; then
+        # Check if stdin is available and contains data (pipe input)
+        if [[ ! -t 0 ]] && [[ -n "$(head -c 1 /dev/stdin 2>/dev/null || true)" ]]; then
+            # Read source directory from stdin (first line)
+            read -r source_dir < /dev/stdin || source_dir=""
+            if [[ -z "$source_dir" ]]; then
+                source_dir="$PWD"
+            fi
+            pndcgn_log_info "Source directory from stdin: $source_dir"
+        elif pndcgn_is_interactive; then
+            # Try fzf integration if available
+            if source_dir=$(pndcgn_select_source_dir 2>/dev/null); then
+                pndcgn_log_info "Selected source directory: $source_dir"
+            else
+                # Fallback to current directory
+                source_dir="$PWD"
+            fi
+        else
+            # Non-interactive, no stdin: use current directory
+            source_dir="$PWD"
+        fi
+    fi
+
+    # Resolve paths (NFR-EDGE-004: trailing slash normalization)
+    source_dir=$(pndcgn_resolve_path "$source_dir")
+    target_dir=$(pndcgn_resolve_path "${target_dir:-$PWD}")
+
+    # Basic validation
+    if [[ ! -d "$source_dir" ]]; then
+        pndcgn_log_error "Source directory does not exist: $source_dir"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    if [[ ! -r "$source_dir" ]]; then
+        pndcgn_log_error "Source directory is not readable: $source_dir"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    if [[ ! -d "$target_dir" ]]; then
+        pndcgn_log_error "Target directory does not exist: $target_dir"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    if [[ ! -w "$target_dir" ]]; then
+        pndcgn_log_error "Target directory is not writable: $target_dir"
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    # Check prerequisites
+    if ! pndcgn_check_prerequisites; then
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
+
+    # Validate output type (case-insensitive - NFR-EDGE-032)
+    output_type=$(printf "%s" "$output_type" | tr '[:upper:]' '[:lower:]')
+    if ! pndcgn_validate_output_type "$output_type"; then
+        exit "${PNDCGN_EXIT_USAGE}"
+    fi
+
+    # Initialize database
+    pndcgn_db_init >/dev/null
+
+    # Handle .pndcgnignore discovery/creation
+    local ignore_file
+    if ! ignore_file=$(pndcgn_discover_ignore_file "$source_dir"); then
+        # Auto-create on first non-help run
+        pndcgn_seed_ignore_file "$source_dir"
+        ignore_file="$source_dir/.pndcgnignore"
+    elif [[ "$reseed" == "true" ]]; then
+        # Reseed if requested
+        rm -f "$ignore_file"
+        pndcgn_seed_ignore_file "$source_dir"
+        ignore_file="$source_dir/.pndcgnignore"
+    fi
+
+    # Handle finalize mode
+    if [[ -n "$finalize_run_id" ]]; then
+        pndcgn_handle_finalize "$finalize_run_id" "$source_dir" "$target_dir" "$output_type" "$ignore_file"
+        exit $?
+    fi
+
+    # Handle resume mode
+    if [[ -n "$resume_run_id" ]]; then
+        pndcgn_handle_resume "$resume_run_id" "$source_dir" "$target_dir" "$output_type" "$ignore_file" "$force"
+        exit $?
+    fi
+
+    # Handle clean mode
+    if [[ ${#clean_run_ids[@]} -gt 0 ]]; then
+        pndcgn_handle_clean "$yes_flag" "${clean_run_ids[@]}"
+        exit $?
+    fi
+
+    # Handle drop mode
+    if [[ "$drop" == "true" ]]; then
+        pndcgn_handle_drop "$yes_flag"
+        exit $?
+    fi
+
+    # Set verbose mode globally
+    if [[ "$verbose" == "true" ]]; then
+        export PNDCGN_VERBOSE=true
+    fi
+
+    # Set quiet mode globally (NFR-CLI-010)
+    if [[ "$quiet" == "true" ]]; then
+        export PNDCGN_QUIET=true
+    fi
+
+    # Create run
+    local run_id
+    local dry_run_int=0
+    [[ "$dry_run" == "true" ]] && dry_run_int=1
+    run_id=$(pndcgn_db_create_run "$source_dir" "$target_dir" "$output_type" "$dry_run_int")
+
+    local formatted_run_id
+    formatted_run_id=$(pndcgn_format_run_id "$run_id")
+    pndcgn_log_info "Run ID: ${BOLD}${formatted_run_id}${RESET}"
+
+    if [[ "$dry_run" == "true" ]]; then
+        # Compute and store fingerprint for dry-run (NFR-CACHE-041-042: multiple pending dry-runs supported)
+        pndcgn_log_info "Computing run fingerprint..."
+        local run_fingerprint
+        run_fingerprint=$(pndcgn_compute_run_fingerprint "$source_dir" "$ignore_file" "$output_type" "$target_dir")
+        pndcgn_db_store_fingerprint "$run_id" "$run_fingerprint"
+
+        # List other pending dry-runs (NFR-CACHE-041-042)
+        local pending_dry_runs
+        pending_dry_runs=$(pndcgn_db_list_pending_dry_runs "$run_id" 2>/dev/null || printf "")
+        if [[ -n "$pending_dry_runs" ]]; then
+            pndcgn_log_info "Other pending dry-runs: $pending_dry_runs"
+        fi
+
+        pndcgn_log_info "DRY-RUN mode: No output artifacts will be created"
+        pndcgn_log_info "Fingerprint stored for finalize validation"
+        local formatted_run_id
+        formatted_run_id=$(pndcgn_format_run_id "$run_id")
+        printf "\n${B_SUCCESS}Dry-run complete${RESET}\n"
+        printf "Run ID: ${BOLD}%s${RESET}\n" "$formatted_run_id"
+        printf "To finalize this run, use: ${BOLD}%s --finalize %s${RESET}\n" "$0" "$formatted_run_id"
+        exit "${PNDCGN_EXIT_SUCCESS}"
+    fi
+
+    # Create output directory
+    local output_dir
+    output_dir=$(pndcgn_create_output_directory "$target_dir" "$output_type" "$run_id")
+
+    # Discover files
+    pndcgn_log_info "Discovering files in: $source_dir"
+    local files
+    mapfile -t files < <(pndcgn_discover_files "$source_dir" "$ignore_file")
+    local total_files=${#files[@]}
+
+    pndcgn_log_info "Found $total_files files to process"
+
+    # Process files
+    local processed=0
+    local skipped=0
+    local failed=0
+    local start_time
+    start_time=$(date +%s)
+
+    # Start progress spinner (NFR-CLI-029-032)
+    if ! pndcgn_is_quiet && pndcgn_is_interactive; then
+        pndcgn_spinner_start "Processing files..."
+    fi
+
+    local current_count=0
+    for file in "${files[@]}"; do
+        current_count=$((processed + skipped + failed + 1))
+
+        # Calculate and display ETA for long operations (NFR-CLI-033)
+        if [[ $total_files -gt 10 ]] && [[ $((current_count % 10)) -eq 0 ]]; then
+            local current_time
+            current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local eta
+            eta=$(pndcgn_calculate_eta "$current_count" "$total_files" "$elapsed")
+            if ! pndcgn_is_quiet; then
+                printf "\r${DIM}Progress: %d/%d (ETA: %s)${RESET}" "$current_count" "$total_files" "$eta" >&2
+            fi
+        fi
+
+        # Stop spinner during file processing (will restart if needed)
+        pndcgn_spinner_stop
+        # Compute input fingerprint
+        local input_fingerprint
+        input_fingerprint=$(pndcgn_compute_fingerprint "$file")
+
+        # Check cache (unless --force)
+        local cached_output=""
+        if [[ "$force" != "true" ]]; then
+            cached_output=$(pndcgn_db_check_cache "$file" "$input_fingerprint" "$output_type" || printf "")
+        fi
+
+        if [[ -n "$cached_output" ]] && [[ -f "$cached_output" ]]; then
+            # Use cached output
+            skipped=$((skipped + 1))
+            pndcgn_log_info "Skipped (cached): $file"
+            continue
+        elif [[ -n "$cached_output" ]] && [[ ! -f "$cached_output" ]]; then
+            # Cached output missing - regenerate
+            pndcgn_log_warn "Cached output missing, regenerating: $cached_output"
+        fi
+
+        # Generate output path with Dewey Decimal prefix
+        local dewey_prefix
+        dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
+        local rel_path="${file#$source_dir/}"
+        local base_name=$(basename "$rel_path" .md)
+        base_name=$(basename "$base_name" .markdown)
+        local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
+
+        # Check for file change during processing (NFR-EDGE-024)
+        local initial_fingerprint
+        initial_fingerprint=$(pndcgn_compute_fingerprint "$file")
+
+        # Convert file
+        local convert_result=0
+        pndcgn_convert_file "$file" "$output_file" "$output_type" || convert_result=$?
+
+        # Check if file changed during processing
+        local current_fingerprint
+        current_fingerprint=$(pndcgn_compute_fingerprint "$file")
+        if [[ "$initial_fingerprint" != "$current_fingerprint" ]]; then
+            pndcgn_log_warn "File changed during processing: $file (fingerprint mismatch)"
+            # Continue processing with new fingerprint
+        fi
+
+        # Handle conversion result
+        if [[ $convert_result -eq 0 ]]; then
+            processed=$((processed + 1))
+
+            # Compute output fingerprint
+            local output_fingerprint
+            output_fingerprint=$(pndcgn_compute_output_fingerprint "$output_dir")
+
+            # Record in database
+            local db_path
+            db_path=$(pndcgn_get_db_path)
+            sqlite3 "$db_path" <<EOF
+INSERT OR REPLACE INTO generated_artifacts
+    (run_id, source_path, output_path, input_fingerprint, output_fingerprint, size_bytes)
+VALUES
+    ('$run_id', '$file', '$output_file', '$input_fingerprint', '$output_fingerprint',
+     $(stat -f%z "$output_file" 2>/dev/null || stat -c%s "$output_file" 2>/dev/null || printf "0"));
+EOF
+
+            pndcgn_log_info "Processed: $file -> $output_file"
+        else
+            # Check for disk full error (NFR-EDGE-018, NFR-EDGE-074)
+            if [[ -f "$output_file" ]] && [[ ! -s "$output_file" ]]; then
+                local disk_usage
+                disk_usage=$(df "$(dirname "$output_file")" 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || printf "0")
+                if [[ "$disk_usage" -ge 99 ]]; then
+                    pndcgn_log_error "Disk full: Cannot write to $output_file"
+                    pndcgn_log_info "Free up disk space and retry"
+                    failed=$((failed + 1))
+                    continue
+                fi
+            fi
+
+            failed=$((failed + 1))
+            pndcgn_log_error "Failed to process: $file"
+        fi
+    done
+
+    # Update run status
+    local end_time
+    end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    local db_path
+    db_path=$(pndcgn_get_db_path)
+    local counters_json="{\"total\":$total_files,\"processed\":$processed,\"skipped\":$skipped,\"failed\":$failed}"
+
+    sqlite3 "$db_path" <<EOF
+UPDATE runs
+SET status = 'complete',
+    completed_at = $end_time,
+    counters_json = '$counters_json'
+WHERE run_id = '$run_id';
+EOF
+
+    # Generate index
+    pndcgn_generate_index "$output_dir" "$run_id" "$counters_json"
+
+    # Print final summary (NFR-CLI-034, NFR-CLI-035-036: column alignment, NFR-CACHE-050: cache statistics)
+    if ! pndcgn_is_quiet; then
+        local formatted_duration
+        formatted_duration=$(pndcgn_format_duration "$duration")
+        local formatted_run_id
+        formatted_run_id=$(pndcgn_format_run_id "$run_id")
+
+        # Get cache statistics (NFR-CACHE-050)
+        local cache_stats
+        cache_stats=$(pndcgn_db_get_cache_stats "$run_id" 2>/dev/null || printf "{}")
+        local cache_efficiency="N/A"
+        if [[ -n "$cache_stats" ]] && [[ "$cache_stats" != "{}" ]]; then
+            if command -v jq >/dev/null 2>&1; then
+                local cached_files
+                cached_files=$(printf "%s" "$cache_stats" | jq -r '.cached_files // 0' 2>/dev/null || printf "0")
+                local total_files
+                total_files=$(printf "%s" "$cache_stats" | jq -r '.total_files // 0' 2>/dev/null || printf "0")
+                if [[ "$total_files" -gt 0 ]]; then
+                    local efficiency_percent=$((cached_files * 100 / total_files))
+                    cache_efficiency="${efficiency_percent}%"
+                fi
+            fi
+        fi
+
+        # Format statistics with column alignment (NFR-CLI-035-036)
+        printf "\n${B_SUCCESS}✓${RESET} Run complete: ${BOLD}%s${RESET}\n" "$formatted_run_id"
+        printf "  %-12s %-12s %-12s\n" "Processed: ${B_GREEN}${processed}${RESET}" "Skipped: ${B_YELLOW}${skipped}${RESET}" "Failed: ${B_RED}${failed}${RESET}"
+        printf "  Duration: %s | Cache efficiency: %s\n" "$formatted_duration" "$cache_efficiency"
+        printf "  Output: %s\n" "$output_dir"
+    fi
+}
+
+# --- Trap Handlers ---
+# Cleanup on interruption (NFR-EDGE-044: SIGHUP is ignored, only INT/TERM are trapped)
+# Note: SIGHUP is intentionally NOT trapped to allow process to continue in background
+pndcgn_cleanup_on_exit() {
+    local exit_code=$?
+    if [[ -n "${run_id:-}" ]] && [[ "$exit_code" -ne 0 ]]; then
+        # Mark run as interrupted if it exists (NFR-CLI-049)
+        if pndcgn_db_run_exists "${run_id:-}" 2>/dev/null; then
+            pndcgn_db_update_run_status "${run_id:-}" "interrupted" 2>/dev/null || true
+            local formatted_run_id
+            formatted_run_id=$(pndcgn_format_run_id "${run_id:-}")
+            printf "\n${B_YELLOW}⚠${RESET} Run interrupted: ${BOLD}%s${RESET}\n" "$formatted_run_id" >&2
+            printf "  To resume, use: ${BOLD}%s --resume %s${RESET}\n" "$0" "$formatted_run_id" >&2
+        fi
+    fi
+    exit $exit_code
+}
+
+trap 'pndcgn_cleanup_on_exit' EXIT
+trap 'pndcgn_cleanup_on_exit' INT TERM
+
+# --- Invoke Main ---
+pndcgn_main "$@"

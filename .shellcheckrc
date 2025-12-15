@@ -1,0 +1,19 @@
+# ShellCheck Configuration for pndcgn
+# Compliant with [AGENTS.md](AGENTS.md)
+
+# Enable all checks
+enable=all
+
+# Disable specific warnings that are acceptable for this project
+# SC1090: Can't follow non-constant source (we use dynamic sourcing)
+# SC1091: Not following (we handle missing sources gracefully)
+disable=SC1090,SC1091
+
+# Exclude patterns
+exclude-dir=tests/fixtures,lib
+
+# Shell dialect
+shell=bash
+
+# Source path (for relative includes)
+source-path=src

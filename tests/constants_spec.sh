@@ -4,7 +4,7 @@
 # shared constants are correctly defined and loaded into the test environment.
 
 # Include the test helper, which sources the constants.
-. "tools/pdf-generator/spec/spec_helper.sh"
+. "${SHELLSPEC_PROJECT_ROOT:-$PWD}/tests/spec_helper.sh"
 
 Describe "Shared Constants Contract (src/constants.sh)"
 
@@ -21,11 +21,11 @@ Describe "Shared Constants Contract (src/constants.sh)"
         End
 
         It "ensures constants are not empty"
-            The value "$CSI" should not be empty
-            The value "$RED" should not be empty
-            The value "$BOLD" should not be empty
-            The value "$RESET" should not be empty
-            The value "$B_RED" should not be empty
+            The value "$CSI" should not eq ""
+            The value "$RED" should not eq ""
+            The value "$BOLD" should not eq ""
+            The value "$RESET" should not eq ""
+            The value "$B_RED" should not eq ""
         End
     End
 End

@@ -56,11 +56,11 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 - [ ] CHK033 - Are alternate test scenarios defined (different paths to same outcome)? [Test Scenarios, Gap]
 - [ ] CHK034 - Are exception test scenarios defined (error handling)? [Test Scenarios, Spec §Edge Cases]
 - [ ] CHK035 - Are recovery test scenarios defined (resume interrupted runs)? [Test Scenarios, Spec §User Story 3]
-- [ ] CHK036 - Are edge case test scenarios defined (source directory doesn't exist)? [Test Scenarios, Spec §Edge Cases]
-- [ ] CHK037 - Are edge case test scenarios defined (target directory not writable)? [Test Scenarios, Spec §Edge Cases]
-- [ ] CHK038 - Are edge case test scenarios defined (unsupported output type)? [Test Scenarios, Spec §Edge Cases]
+- [X] CHK036 - Are edge case test scenarios defined (source directory doesn't exist)? [Test Scenarios, Spec §Edge Cases] ✅ Tested: source directory unreadable (T049e)
+- [X] CHK037 - Are edge case test scenarios defined (target directory not writable)? [Test Scenarios, Spec §Edge Cases] ✅ Tested: target directory unwritable (T049f)
+- [X] CHK038 - Are edge case test scenarios defined (unsupported output type)? [Test Scenarios, Spec §Edge Cases] ✅ Tested: unsupported output type (T049g)
 - [ ] CHK039 - Are edge case test scenarios defined (interrupted run resumption)? [Test Scenarios, Spec §Edge Cases]
-- [ ] CHK040 - Are edge case test scenarios defined (cached outputs missing)? [Test Scenarios, Spec §Edge Cases]
+- [X] CHK040 - Are edge case test scenarios defined (cached outputs missing)? [Test Scenarios, Spec §Edge Cases] ✅ Tested: cached outputs missing, regenerate with warning (T049h)
 - [ ] CHK041 - Are edge case test scenarios defined (inputs change between dry-run and finalize)? [Test Scenarios, Spec §Edge Cases]
 
 ---

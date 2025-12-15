@@ -76,7 +76,7 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## User-Facing Documentation Requirements
 
-- [ ] CHK040 - Are user-facing documentation requirements clearly defined (user guide requirements)? [Completeness, Constitution §III, Gap]
+- [X] CHK040 - Are user-facing documentation requirements clearly defined (user guide requirements)? [Completeness, Constitution §III, Gap] ✅ Implemented: Man page, migration examples, troubleshooting guide (T177, T181, T182)
 - [ ] CHK041 - Are user-facing documentation requirements clearly defined (help text requirements)? [Completeness, Spec §FR-017, Gap]
 - [ ] CHK042 - Are user-facing documentation requirements clearly defined (error message documentation)? [Completeness, Spec §FR-015, Gap]
 - [ ] CHK043 - Are user-facing documentation requirements clearly defined (run index as user documentation)? [Completeness, Spec §FR-007]
@@ -124,7 +124,7 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 - [ ] CHK066 - Are documentation clarity requirements clearly defined (unambiguous language)? [Clarity, Gap]
 - [ ] CHK067 - Are documentation clarity requirements clearly defined (clear structure and organization)? [Clarity, Constitution §Documentation Standards]
-- [ ] CHK068 - Are documentation clarity requirements clearly defined (clear examples and use cases)? [Clarity, Gap]
+- [X] CHK068 - Are documentation clarity requirements clearly defined (clear examples and use cases)? [Clarity, Gap] ✅ Implemented: Migration examples and troubleshooting guide with examples (T181, T182)
 - [ ] CHK069 - Are documentation clarity requirements clearly defined (clear terminology and definitions)? [Clarity, Gap]
 - [ ] CHK070 - Are documentation clarity requirements clearly defined (clear navigation and cross-references)? [Clarity, Constitution §Documentation Standards]
 - [ ] CHK071 - Are documentation clarity requirements measurable (can clarity be verified)? [Measurability, Gap]
@@ -209,7 +209,7 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 - [ ] CHK110 - Is there ambiguity in generated documentation requirements? [Ambiguity, Spec §FR-007, FR-008]
 - [ ] CHK111 - Is there ambiguity in documentation-driven design requirements? [Ambiguity, Constitution §III]
 - [ ] CHK112 - Is there ambiguity in documentation structure requirements? [Ambiguity, Constitution §Documentation Standards]
-- [ ] CHK113 - Are there missing documentation requirements for user guide? [Gap, Constitution §III]
+- [X] CHK113 - Are there missing documentation requirements for user guide? [Gap, Constitution §III] ✅ Implemented: Man page, migration examples, troubleshooting guide (T177, T181, T182)
 - [ ] CHK114 - Are there missing documentation requirements for API reference? [Gap, Constitution §III]
 - [ ] CHK115 - Are there missing documentation requirements for technical specification? [Gap, Constitution §III]
 - [ ] CHK116 - Are there missing documentation requirements for test plans? [Gap, Constitution §III]

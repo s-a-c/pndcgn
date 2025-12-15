@@ -24,7 +24,7 @@
 
 ### 1.1. Purpose
 
-This document defines unit and feature tests for individual modules. Tests follow BDD style using shellspec and ensure 90%+ code coverage.
+This document defines unit and feature tests for individual modules. Tests follow BDD style using shellspec and target 50-70% code coverage (see Constitution §II for coverage tracking limitations).
 
 ### 1.2. Test Framework
 
@@ -35,18 +35,32 @@ This document defines unit and feature tests for individual modules. Tests follo
 # All tests
 shellspec
 
-# Specific module
-shellspec specs/utilities_spec.sh
+# Using test scripts (recommended)
+./scripts/run-all-tests.sh
+./scripts/run-unit-tests.sh
+./scripts/run-integration-tests.sh
+
+# Specific test file
+./scripts/run-test.sh tests/utilities/logging_spec.sh
 
 # With coverage
-kcov coverage/ shellspec
+./scripts/run-coverage.sh all
+
+# Local CI workflow
+./scripts/local-ci.sh
 ```
+
+**Test Structure** (as of 2025-12-14):
+- **Modular Unit Tests**: `tests/utilities/`, `tests/database/`, `tests/processing/` (18 files)
+- **Integration Tests**: `tests/integration/` (3 files, 16 tests without mocks)
+- **Feature Tests**: `tests/pndcgn_spec.sh`, `tests/performance_spec.sh`, `tests/usability_spec.sh`
+- **Legacy Files**: `tests/utilities_spec.sh`, `tests/database_spec.sh`, `tests/processing_spec.sh` (deprecated)
 
 ---
 
 ## 2. Constants Module Tests
 
-**File**: `specs/constants_spec.sh`
+**File**: `tests/constants_spec.sh`
 
 **Tests**:
 ```bash
@@ -55,7 +69,7 @@ Describe 'Constants Module'
     When call printf "%s" "$PNDCGN_RED"
     The output should start with "\\033["
   End
-  
+
   It 'defines all required colors'
     The variable PNDCGN_GREEN should be defined
     The variable PNDCGN_YELLOW should be defined
@@ -63,7 +77,7 @@ Describe 'Constants Module'
     The variable PNDCGN_BOLD should be defined
     The variable PNDCGN_RESET should be defined
   End
-  
+
   It 'respects NO_COLOR environment variable'
     NO_COLOR=1 source src/constants.sh
     The variable PNDCGN_RED should equal ""
@@ -84,7 +98,7 @@ Describe 'pndcgn_generate_ulid'
     When call pndcgn_generate_ulid
     The length of output should equal 26
   End
-  
+
   It 'generates unique IDs'
     id1=$(pndcgn_generate_ulid)
     id2=$(pndcgn_generate_ulid)
@@ -100,7 +114,7 @@ Describe 'pndcgn_resolve_path'
     When call pndcgn_resolve_path "../docs"
     The output should start with "/"
   End
-  
+
   It 'handles current directory'
     When call pndcgn_resolve_path "."
     The output should equal "$PWD"
@@ -129,7 +143,14 @@ End
 
 ## 4. Database Module Tests
 
-**File**: `specs/database_spec.sh`
+**Files**: `tests/database/*.sh` (modular structure)
+
+**Test Files**:
+- `tests/database/run_creation_spec.sh` - Run creation with ULID generation
+- `tests/database/cache_lookup_spec.sh` - Cache lookup functions
+- `tests/database/fingerprint_storage_spec.sh` - Fingerprint storage and retrieval
+
+**Legacy File**: `tests/database_spec.sh` (deprecated, use modular files above)
 
 **Schema Creation**:
 ```bash
@@ -138,12 +159,12 @@ Describe 'pndcgn_db_init'
     When call pndcgn_db_init
     The result of "table_exists runs" should be success
   End
-  
+
   It 'creates generated_pdfs table'
     When call pndcgn_db_init
     The result of "table_exists generated_pdfs" should be success
   End
-  
+
   It 'creates indexes'
     When call pndcgn_db_init
     The result of "index_exists idx_fingerprints" should be success
@@ -185,7 +206,7 @@ Describe 'pndcgn_db_get_fingerprint'
     When call pndcgn_db_get_fingerprint "fp123" "pdf"
     The output should equal "/out/f.pdf"
   End
-  
+
   It 'returns nothing for missing fingerprint'
     When call pndcgn_db_get_fingerprint "nonexistent" "pdf"
     The output should equal ""
@@ -197,7 +218,20 @@ End
 
 ## 5. Processing Module Tests
 
-**File**: `specs/processing_spec.sh`
+**Files**: `tests/processing/*.sh` (modular structure)
+
+**Test Files**:
+- `tests/processing/file_discovery_spec.sh` - File discovery respecting .pndcgnignore
+- `tests/processing/fingerprint_computation_spec.sh` - Input file fingerprint computation
+- `tests/processing/pandoc_conversion_spec.sh` - Pandoc conversion functions
+- `tests/processing/dewey_naming_spec.sh` - Dewey Decimal naming scheme
+- `tests/processing/output_directory_spec.sh` - Output directory creation
+- `tests/processing/index_generation_spec.sh` - Run index generation
+- `tests/processing/output_fingerprint_spec.sh` - Output fingerprint computation
+- `tests/processing/run_fingerprint_spec.sh` - Run fingerprint computation
+- `tests/processing/fingerprint_validation_spec.sh` - Fingerprint validation
+
+**Legacy File**: `tests/processing_spec.sh` (deprecated, use modular files above)
 
 **File Discovery**:
 ```bash
@@ -207,12 +241,12 @@ Describe 'pndcgn_find_files'
     touch /tmp/test/file1.md
     touch /tmp/test/sub/file2.md
   }
-  
+
   It 'finds markdown files'
     When call pndcgn_find_files "/tmp/test"
     The lines of output should equal 2
   End
-  
+
   cleanup() {
     rm -rf /tmp/test
   }
@@ -227,7 +261,7 @@ Describe 'pndcgn_compute_fingerprint'
     fp2=$(pndcgn_compute_fingerprint "/tmp/test.md")
     The variable fp1 should equal "$fp2"
   End
-  
+
   It 'format includes size:mtime:hash'
     When call pndcgn_compute_fingerprint "/tmp/test.md"
     The output should match pattern "*:*:*"
@@ -244,7 +278,7 @@ Describe 'pndcgn_convert_file'
     The status should be success
     The path "/tmp/test.pdf" should be file
   End
-  
+
   It 'handles pandoc errors'
     echo "{{invalid}}" > /tmp/invalid.md
     When call pndcgn_convert_file "/tmp/invalid.md" "/tmp/out.pdf" "pdf"
@@ -257,7 +291,7 @@ End
 
 ## 6. Main Controller Tests
 
-**File**: `specs/cli_spec.sh`
+**File**: `tests/pndcgn_spec.sh` - Main CLI entrypoint tests
 
 **Argument Parsing**:
 ```bash
@@ -267,12 +301,12 @@ Describe 'CLI argument parsing'
     The output should include "Usage:"
     The status should be success
   End
-  
+
   It 'parses --version'
     When run bin/pdf-generator --version
     The output should include "pndcgn"
   End
-  
+
   It 'parses --verbose'
     When run bin/pdf-generator --verbose /tmp/test
     The variable pndcgn_verbose should equal "1"
@@ -286,18 +320,49 @@ End
 
 **Run all tests**:
 ```bash
+# Using shellspec directly
 shellspec
+
+# Using test scripts (recommended)
+./scripts/run-all-tests.sh
+```
+
+**Run specific suites**:
+```bash
+./scripts/run-unit-tests.sh          # Unit tests only
+./scripts/run-feature-tests.sh       # Feature tests only
+./scripts/run-integration-tests.sh   # Integration tests only
+```
+
+**Run individual test**:
+```bash
+./scripts/run-test.sh tests/utilities/logging_spec.sh
+./scripts/run-test.sh tests/pndcgn_spec.sh 25  # Specific test block
 ```
 
 **Run with coverage**:
 ```bash
-kcov coverage/ shellspec
+# Using test scripts (recommended)
+./scripts/run-coverage.sh all
+./scripts/run-coverage.sh unit
+./scripts/run-coverage.sh integration
+
+# Direct shellspec (may fail on macOS due to ptrace limitations)
+shellspec --kcov
+```
+
+**Local CI workflow**:
+```bash
+./scripts/local-ci.sh                 # Full CI workflow (lint + test + coverage)
+./scripts/local-ci.sh --skip-coverage # Skip coverage (faster)
 ```
 
 **Check coverage report**:
 ```bash
-open coverage/index.html
+open tests.results/coverage/index.html
 ```
+
+**Note**: Coverage works best on Linux. Use Docker (`Dockerfile.test`) or CI (`.github/workflows/test-coverage.yml`) for accurate results on macOS.
 
 ---
 

@@ -12,14 +12,14 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## BDD Scenario Completeness
 
-- [ ] CHK001 - Are all user stories documented with at least one BDD scenario? [Completeness, Spec §User Scenarios]
-- [ ] CHK002 - Does User Story 1 (Generate documentation outputs) have BDD scenarios covering default inputs? [Completeness, Spec §User Story 1]
-- [ ] CHK003 - Does User Story 1 have BDD scenarios covering custom output format and location? [Completeness, Spec §User Story 1]
-- [ ] CHK004 - Does User Story 2 (Preview and finalize) have BDD scenarios covering dry-run mode? [Completeness, Spec §User Story 2]
-- [ ] CHK005 - Does User Story 2 have BDD scenarios covering successful finalize (unchanged inputs)? [Completeness, Spec §User Story 2]
-- [ ] CHK006 - Does User Story 2 have BDD scenarios covering failed finalize (changed inputs)? [Completeness, Spec §User Story 2]
-- [ ] CHK007 - Does User Story 3 (Manage runs) have BDD scenarios covering resume interrupted run? [Completeness, Spec §User Story 3]
-- [ ] CHK008 - Does User Story 3 have BDD scenarios covering cleanup of completed runs? [Completeness, Spec §User Story 3]
+- [X] CHK001 - Are all user stories documented with at least one BDD scenario? [Completeness, Spec §User Scenarios] ✅ All 3 user stories have BDD scenarios in spec.md
+- [X] CHK002 - Does User Story 1 (Generate documentation outputs) have BDD scenarios covering default inputs? [Completeness, Spec §User Story 1] ✅ Scenario 1: "Given... When I run with default inputs..."
+- [X] CHK003 - Does User Story 1 have BDD scenarios covering custom output format and location? [Completeness, Spec §User Story 1] ✅ Scenario 2: "When I request a specific output format and location..."
+- [X] CHK004 - Does User Story 2 (Preview and finalize) have BDD scenarios covering dry-run mode? [Completeness, Spec §User Story 2] ✅ Scenario 1: "When I run the tool in dry-run mode..."
+- [X] CHK005 - Does User Story 2 have BDD scenarios covering successful finalize (unchanged inputs)? [Completeness, Spec §User Story 2] ✅ Scenario 2: "Given... unchanged inputs, When I finalize..."
+- [X] CHK006 - Does User Story 2 have BDD scenarios covering failed finalize (changed inputs)? [Completeness, Spec §User Story 2] ✅ Scenario 3: "Given... changed inputs, When I finalize..."
+- [X] CHK007 - Does User Story 3 (Manage runs) have BDD scenarios covering resume interrupted run? [Completeness, Spec §User Story 3] ✅ Scenario 1: "When I resume a previously started run..."
+- [X] CHK008 - Does User Story 3 have BDD scenarios covering cleanup of completed runs? [Completeness, Spec §User Story 3] ✅ Scenario 2: "When I clean up completed runs..."
 - [ ] CHK009 - Are BDD scenarios defined for edge case: source directory does not exist? [Completeness, Spec §Edge Cases, Gap]
 - [ ] CHK010 - Are BDD scenarios defined for edge case: source directory is unreadable? [Completeness, Spec §Edge Cases, Gap]
 - [ ] CHK011 - Are BDD scenarios defined for edge case: target directory is not writable? [Completeness, Spec §Edge Cases, Gap]
@@ -35,10 +35,10 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## BDD Format Quality
 
-- [ ] CHK020 - Do all scenarios follow proper Given-When-Then structure? [Format Quality, Spec §User Scenarios]
-- [ ] CHK021 - Are Given clauses clearly specifying preconditions (not actions)? [Format Quality, Spec §User Scenarios]
-- [ ] CHK022 - Are When clauses clearly specifying user actions (not system behavior)? [Format Quality, Spec §User Scenarios]
-- [ ] CHK023 - Are Then clauses clearly specifying observable outcomes (not implementation details)? [Format Quality, Spec §User Scenarios]
+- [X] CHK020 - Do all scenarios follow proper Given-When-Then structure? [Format Quality, Spec §User Scenarios] ✅ All scenarios in spec.md use Given-When-Then format
+- [X] CHK021 - Are Given clauses clearly specifying preconditions (not actions)? [Format Quality, Spec §User Scenarios] ✅ Verified: "Given a directory..." format
+- [X] CHK022 - Are When clauses clearly specifying user actions (not system behavior)? [Format Quality, Spec §User Scenarios] ✅ Verified: "When I run..." format
+- [X] CHK023 - Are Then clauses clearly specifying observable outcomes (not implementation details)? [Format Quality, Spec §User Scenarios] ✅ Verified: "Then it generates..." format
 - [ ] CHK024 - Are scenarios written in third-person or first-person consistently? [Format Quality, Spec §User Scenarios]
 - [ ] CHK025 - Do scenarios avoid implementation details in Given-When-Then statements? [Format Quality, Spec §User Scenarios]
 - [ ] CHK026 - Are scenarios independent (can run in any order without dependencies)? [Format Quality, Spec §User Scenarios]
@@ -50,9 +50,9 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
 
 ## Scenario Type Coverage
 
-- [ ] CHK030 - Are Primary scenarios (happy path) defined for User Story 1? [Scenario Coverage, Spec §User Story 1]
-- [ ] CHK031 - Are Primary scenarios (happy path) defined for User Story 2? [Scenario Coverage, Spec §User Story 2]
-- [ ] CHK032 - Are Primary scenarios (happy path) defined for User Story 3? [Scenario Coverage, Spec §User Story 3]
+- [X] CHK030 - Are Primary scenarios (happy path) defined for User Story 1? [Scenario Coverage, Spec §User Story 1] ✅ Scenario 1: default inputs, generates outputs
+- [X] CHK031 - Are Primary scenarios (happy path) defined for User Story 2? [Scenario Coverage, Spec §User Story 2] ✅ Scenario 1: dry-run mode, Scenario 2: successful finalize
+- [X] CHK032 - Are Primary scenarios (happy path) defined for User Story 3? [Scenario Coverage, Spec §User Story 3] ✅ Scenario 1: resume interrupted run, Scenario 2: cleanup
 - [ ] CHK033 - Are Alternate scenarios defined (different paths to same outcome)? [Scenario Coverage, Gap]
 - [ ] CHK034 - Are Exception scenarios defined for invalid inputs (source directory doesn't exist)? [Scenario Coverage, Spec §Edge Cases]
 - [ ] CHK035 - Are Exception scenarios defined for permission errors (target not writable)? [Scenario Coverage, Spec §Edge Cases]

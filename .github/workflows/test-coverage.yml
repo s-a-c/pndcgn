@@ -1,0 +1,57 @@
+# GitHub Actions workflow for test coverage
+#
+# Compliant with [AGENTS.md](AGENTS.md)
+#
+# Purpose: Run tests with kcov on Linux (Ubuntu) for accurate coverage tracking
+# macOS has ptrace limitations that prevent kcov from working correctly
+
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-coverage:
+    name: Run Tests with Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellspec kcov sqlite3 pandoc git curl fzf
+
+      - name: Run tests with kcov
+        run: |
+          shellspec --kcov --format documentation
+
+      - name: Generate coverage reports
+        run: |
+          if [ -f tests.results/generate-reports.sh ]; then
+            tests.results/generate-reports.sh
+          fi
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            tests.results/coverage/
+            tests.results/reports/
+          retention-days: 30
+
+      - name: Upload to Codecov (if configured)
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: tests.results/coverage/cobertura.xml
+          fail_ci_if_error: false
+          verbose: true

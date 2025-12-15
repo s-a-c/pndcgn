@@ -26,8 +26,8 @@ Bash (strict mode: `set -euo pipefail`): Follow standard conventions
 ## Recent Changes
 - 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) + curl (for extension download)
 - 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) + curl (for extension download)
+- 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test) + curl (for extension download)
 
-- 001-sync-docs-spec: Added Bash (strict mode: `set -euo pipefail`) + pandoc + sqlite3 + shellspec (test)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

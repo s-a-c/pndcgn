@@ -36,6 +36,33 @@
 .augment/rules/byterover-rules.md
 
 # ============================================================================
+# Shell/Bash Project Patterns
+# ============================================================================
+# ShellCheck reports
+.shellcheck-reports/
+*.shellcheck.log
+
+# Test coverage
+coverage/
+*.coverage
+.shellspec-coverage/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# pndcgn runtime artifacts
+.pndcgn/
+*.pndcgnignore.bak
+
+# SQLite databases (runtime)
+*.sqlite
+*.sqlite3
+*.db
+
+# ============================================================================
 # Project-Specific Patterns
 # ============================================================================
 # Ignore files/folders with digit-only names (no extension) at any directory level

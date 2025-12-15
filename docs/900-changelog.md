@@ -42,7 +42,7 @@ This changelog documents all significant changes to the pndcgn project. The curr
 
 **Purpose**: Establish documentation foundation and define core constants
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `c4f7080` - "docs: Add foundation documents"
 
 ### 2.2. Phase 2: Requirements
@@ -58,7 +58,7 @@ This changelog documents all significant changes to the pndcgn project. The curr
 - Output and reporting (REQ-011, REQ-012)
 - Run management (REQ-013 through REQ-015)
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `cf17963` - "docs: Add requirements specification"
 
 ### 2.3. Phase 3: User Documentation
@@ -81,7 +81,7 @@ This changelog documents all significant changes to the pndcgn project. The curr
 - 7 detailed examples from basic to advanced
 - Troubleshooting common errors
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `e238f5f` - "docs: Add user-facing documentation"
 
 ### 2.4. Phase 4: Technical Documentation
@@ -114,7 +114,7 @@ This changelog documents all significant changes to the pndcgn project. The curr
 - Use cases and limitations for each format
 - Format selection decision tree
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `8605941` - "docs: Add technical documentation"
 
 ### 2.5. Phase 5: Implementation Planning
@@ -136,13 +136,13 @@ This changelog documents all significant changes to the pndcgn project. The curr
 - Acceptance criteria
 
 **Testing strategy**:
-- 90%+ code coverage target
+- 50-70% code coverage target (see Constitution §II for kcov/ShellSpec limitations)
 - Unit, integration, and system tests
 - shellspec + kcov + shellcheck tools
 
 **References**: All 15 requirements (REQ-001 through REQ-015)
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `919fe54` - "docs: Add implementation plan"
 
 ### 2.6. Phase 6: Testing Documentation
@@ -166,10 +166,10 @@ This changelog documents all significant changes to the pndcgn project. The curr
 
 **Testing strategy**:
 - BDD-style with shellspec
-- 90%+ code coverage target
-- kcov for coverage measurement
+- 50-70% code coverage target (kcov has subprocess tracking limitations)
+- kcov for coverage measurement (best on Linux/Docker)
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `[current]` - "docs: Add testing documentation"
 
 ### 2.7. Phase 7: Completion
@@ -192,7 +192,7 @@ This changelog documents all significant changes to the pndcgn project. The curr
 - Document summaries
 - Line counts and statistics
 
-**Status**: ✅ Complete  
+**Status**: ✅ Complete
 **Commit**: `[current]` - "docs: Add README and changelog"
 
 **Documentation recovery complete**: 13 documents, 6,511 total lines

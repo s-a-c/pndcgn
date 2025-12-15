@@ -1,63 +1,82 @@
 #!/usr/bin/env bash
+#
+# pndcgn Test Helper
+#
+# Compliant with [AGENTS.md](../AGENTS.md)
+#
+# Description: Test helper for pndcgn tool.
+# Sets up clean test environment, provides mocking capabilities,
+# and sources shared constants.
 
-# Description: This is the test helper for the pdf-generator tool.
-# It sets up a clean test environment, provides mocking capabilities,
-# and sources the shared constants file to ensure tests match application output.
+set -euo pipefail
 
 # --- Shared Constants ---
-# Source the single source of truth for constants like ANSI codes.
-# The path is relative to the project root, as that's where shellspec runs from.
-. "tools/pdf-generator/src/constants.sh"
+# Source constants from project root (where shellspec runs from)
+. "${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/constants.sh"
 
 # --- Test Environment Setup ---
 
 # Creates a temporary directory for tests and sets the script path.
 setup_test_env() {
-    # Create a temporary directory and store its name.
+    local temp_dir
     if ! temp_dir=$(mktemp -d); then
         printf "FATAL: Failed to create temporary directory for tests.\n" >&2
         exit 1
     fi
-    
-    # Set the path to the main script for use in tests.
-    # The PWD variable will be the project root when shellspec is run.
-    script="$PWD/tools/pdf-generator/bin/pdf-generator"
-    
-    # Move into the temporary directory for test isolation.
-    cd "$temp_dir"
+
+    # Set the path to the main script for use in tests
+    # PWD is project root when shellspec runs
+    readonly script="${SHELLSPEC_PROJECT_ROOT:-$PWD}/bin/pndcgn"
+
+    # Move into temporary directory for test isolation
+    cd "$temp_dir" || exit 1
+
+    # Export for use in tests
+    export temp_dir script
 }
 
 # Removes the temporary directory and mock functions.
 cleanup_test_env() {
-    # Exit the temporary directory and remove it.
-    # The 'cd -' command returns to the previous directory.
-    cd - >/dev/null
-    rm -rf "$temp_dir"
+    cd - >/dev/null || true
+    if [[ -n "${temp_dir:-}" ]] && [[ -d "${temp_dir:-}" ]]; then
+        rm -rf "$temp_dir"
+    fi
 }
 
 # --- Mocking Framework ---
 
-# This function mocks all external commands used by the main script.
-# The mocks simply print their name and arguments to stdout for inspection.
+# Mocks external commands used by pndcgn
 mock_all_commands() {
-    # List of commands to be mocked.
-    local commands_to_mock=("pandoc" "sqlite3" "uv" "yq")
+    local commands_to_mock=("pandoc" "sqlite3" "curl" "fzf" "git")
 
-    # Iterate through the list and create a mock function for each.
     for cmd in "${commands_to_mock[@]}"; do
         eval "$cmd() { printf '%s called with: %s\\n' '$cmd' \"\$*\"; }"
         export -f "$cmd"
     done
 }
 
-# This function cleans up all mocks created by mock_all_commands.
+# Cleans up all mocks
 cleanup_mocks() {
-    # Same list of commands as in the setup function, plus any ad-hoc mocks.
-    local commands_to_mock=("pandoc" "sqlite3" "uv" "yq" "mkdir")
+    local commands_to_mock=("pandoc" "sqlite3" "curl" "fzf" "git" "mkdir" "rm" "sha256sum" "shasum")
 
-    # Iterate and unset each function.
     for cmd in "${commands_to_mock[@]}"; do
-        # Unset the function, redirecting errors to /dev/null in case it wasn't set.
         unset -f "$cmd" &>/dev/null || true
     done
+}
+
+# Helper: sqlite3 mock that reads from stdin (for heredoc usage)
+# Usage in tests: Override this function with test-specific logic
+mock_sqlite3_heredoc() {
+    local db_file="${1:-}"
+    # Read query from stdin (heredoc)
+    local query
+    query=$(cat)
+
+    # Default: return empty for unknown queries
+    case "$db_file" in
+        *pndcgn.db)
+            # Test-specific mocks should override this
+            return 0
+            ;;
+    esac
 }

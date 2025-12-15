@@ -71,6 +71,8 @@ This documentation set provides comprehensive guidance for the **pndcgn** tool, 
 - [100-system-test-plan.md](100-system-test-plan.md) - System tests mapped to requirements (shellspec)
 - [110-implementation-plan.md](110-implementation-plan.md) - Implementation plan with requirements references
 - [120-feature-unit-test-plan.md](120-feature-unit-test-plan.md) - Feature and unit tests for implementation (shellspec)
+- `tests/README.md` - Test suite documentation and organization
+- `scripts/README.md` - Test execution scripts library
 
 ### 3.5. Supporting Documentation
 
@@ -103,6 +105,8 @@ This documentation set provides comprehensive guidance for the **pndcgn** tool, 
 - Requirements → [020-requirements.md](020-requirements.md)
 - Implementation tasks → [110-implementation-plan.md](110-implementation-plan.md)
 - Writing tests → [100-system-test-plan.md](100-system-test-plan.md), [120-feature-unit-test-plan.md](120-feature-unit-test-plan.md)
+- Running tests → `tests/README.md`, `scripts/README.md`
+- Test scripts → `scripts/run-*.sh`, `scripts/local-ci.sh`
 - ANSI constants → [200-constants.md](200-constants.md)
 
 **Troubleshooting**:
@@ -127,10 +131,19 @@ All documentation follows these standards from AGENTS.md:
 This project uses **shellspec** for BDD/TDD testing of shell scripts:
 
 - shellspec is already configured in `.idx/dev.nix`
-- Test files are located in `spec/` directory
+- Test files are located in `tests/` directory (modular structure as of 2025-12-14)
 - System tests validate requirements → [100-system-test-plan.md](100-system-test-plan.md)
 - Feature/unit tests validate implementation → [120-feature-unit-test-plan.md](120-feature-unit-test-plan.md)
+- Integration tests (no mocks) → `tests/integration/` (16 tests)
+- Test execution scripts → `scripts/` directory (comprehensive test runner library)
+- Coverage tracking → kcov with Docker/CI support (macOS has ptrace limitations)
 - `constants.sh` is shared between production code and tests → [200-constants.md](200-constants.md)
+
+**Test Organization** (as of 2025-12-14):
+- **Unit Tests**: `tests/utilities/`, `tests/database/`, `tests/processing/` (18 modular files)
+- **Integration Tests**: `tests/integration/` (3 files, 16 tests without mocks)
+- **Feature Tests**: `tests/pndcgn_spec.sh`, `tests/performance_spec.sh`, `tests/usability_spec.sh`
+- **Scripts**: `scripts/run-*.sh` for test execution, `scripts/local-ci.sh` for CI workflow
 
 ## 7. Navigation
 

@@ -51,6 +51,7 @@ The constants file serves three primary purposes:
 ```bash
 ERROR_COLOR='\033[31;1m'  # Bold Red
 ```
+
 - Used for: Fatal errors, missing prerequisites, invalid arguments
 - Example: `ERROR: Prerequisite not found: 'pandoc'`
 
@@ -58,6 +59,7 @@ ERROR_COLOR='\033[31;1m'  # Bold Red
 ```bash
 SUCCESS_COLOR='\033[32;1m'  # Bold Green
 ```
+
 - Used for: Successful completion, validation passed, confirmation
 - Example: `Success! All documentation has been generated.`
 
@@ -65,6 +67,7 @@ SUCCESS_COLOR='\033[32;1m'  # Bold Green
 ```bash
 WARNING_COLOR='\033[33;1m'  # Bold Yellow
 ```
+
 - Used for: Non-fatal issues, deprecation notices, confirmations needed
 - Example: `Warning: This operation will delete all cached data.`
 

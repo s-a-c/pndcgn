@@ -62,6 +62,13 @@ This system test plan validates end-to-end workflows and ensures requirements (R
 - Pandoc 2.x+
 - shellspec (testing framework)
 
+**Test Execution**:
+- Run tests: `./scripts/run-all-tests.sh` or `shellspec`
+- Run specific suite: `./scripts/run-unit-tests.sh`, `./scripts/run-integration-tests.sh`
+- Run with coverage: `./scripts/run-coverage.sh all` (works best on Linux)
+- Local CI: `./scripts/local-ci.sh`
+- See `tests/README.md` and `scripts/README.md` for details
+
 **Test data**:
 ```log
 fixtures/
@@ -209,14 +216,14 @@ Describe 'ST-003: Basic generation'
     mkdir -p /tmp/test
     echo "# Test" > /tmp/test/simple.md
   }
-  
+
   It 'generates PDF from markdown'
     When run bin/pdf-generator /tmp/test
     The status should be success
     The output should include "1 processed"
     The path "/tmp/test/pndcgn/pdf-*/simple.pdf" should be file
   End
-  
+
   cleanup() {
     rm -rf /tmp/test
   }
@@ -257,10 +264,10 @@ Describe 'ST-004: Multiple formats'
   It 'generates PDF, EPUB, and HTML'
     When run bin/pdf-generator --type pdf /tmp/test
     The path "/tmp/test/pndcgn/pdf-*/simple.pdf" should be file
-    
+
     When run bin/pdf-generator --type epub /tmp/test
     The path "/tmp/test/pndcgn/epub-*/simple.epub" should be file
-    
+
     When run bin/pdf-generator --type html /tmp/test
     The path "/tmp/test/pndcgn/html-*/simple.html" should be file
   End
@@ -300,7 +307,7 @@ Describe 'ST-005: Caching'
     # First run
     When run bin/pdf-generator /tmp/test
     The output should include "3 processed"
-    
+
     # Second run
     When run bin/pdf-generator /tmp/test
     The output should include "3 skipped (cached)"
@@ -339,10 +346,10 @@ Describe 'ST-006: Cache invalidation'
   It 'regenerates modified files'
     # First run
     bin/pdf-generator /tmp/test
-    
+
     # Modify one file
     echo "Updated" >> /tmp/test/file1.md
-    
+
     # Second run
     When run bin/pdf-generator /tmp/test
     The output should include "1 processed"
@@ -416,7 +423,7 @@ Describe 'ST-008: Force regeneration'
   It 'ignores cache with --force'
     # First run
     bin/pdf-generator /tmp/test
-    
+
     # Force regeneration
     When run bin/pdf-generator --force /tmp/test
     The output should include "3 processed"
@@ -450,7 +457,7 @@ Describe 'ST-009: Clean cache'
   It 'removes old cache entries'
     # Create multiple runs
     create_old_runs
-    
+
     When run bin/pdf-generator --clean
     The status should be success
     The output should include "Removed"
@@ -578,7 +585,7 @@ Describe 'ST-013: Resumption'
   It 'resumes interrupted run'
     # Simulate partial run
     run_id=$(start_partial_run)
-    
+
     # Resume
     When run bin/pdf-generator --resume "${run_id}"
     The output should include "Resuming"
@@ -615,7 +622,7 @@ Describe 'ST-014: ANSI colors'
     When run bin/pdf-generator /tmp/test
     The output should include "\\033["
   End
-  
+
   It 'respects NO_COLOR'
     NO_COLOR=1
     When run bin/pdf-generator /tmp/test
@@ -660,7 +667,7 @@ Describe 'ST-015: Dry-run finalization'
     run_id=$(bin/pdf-generator --dry-run /tmp/test | extract_run_id)
     The path "/tmp/test/pndcgn/pdf-*/*.pdf" should not be file
   End
-  
+
   It 'generates files when finalized'
     When run bin/pdf-generator --finalize "${run_id}"
     The path "/tmp/test/pndcgn/pdf-*/*.pdf" should be file

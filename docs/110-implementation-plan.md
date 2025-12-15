@@ -88,9 +88,10 @@ src/utilities.sh            ULID, paths, logging
 pdf-generator.toml          Configuration template
 specs/spec_helper.sh        shellspec setup
 specs/utilities_spec.sh     Utility tests
-```
+```text
 
 **Functionality**:
+
 - Parse command-line arguments
 - Generate ULIDs
 - Resolve paths
@@ -130,7 +131,7 @@ Describe 'Constants'
     When call printf "%s" "$PNDCGN_RED"
     The output should start with "\\033["
   End
-  
+
   It 'respects NO_COLOR'
     NO_COLOR=1
     When run source src/constants.sh
@@ -158,7 +159,7 @@ Describe 'pndcgn_generate_ulid'
     When call pndcgn_generate_ulid
     The output should have length 26
   End
-  
+
   It 'starts with timestamp component'
     ulid=$(pndcgn_generate_ulid)
     first_char="${ulid:0:1}"
@@ -195,7 +196,7 @@ Describe 'CLI argument parsing'
     The output should include "Usage:"
     The status should be success
   End
-  
+
   It 'sets verbose mode with --verbose'
     When run bin/pdf-generator --verbose --help
     The variable pndcgn_verbose should equal "1"
@@ -219,9 +220,10 @@ End
 ```log
 src/database.sh             Database operations
 specs/database_spec.sh      Database tests
-```
+```log
 
 **Functionality**:
+
 - Initialize database schema
 - Start/finish runs
 - Store/retrieve fingerprints
@@ -253,12 +255,12 @@ Describe 'pndcgn_db_init'
     When call pndcgn_db_init
     The result of "tables_exist" should equal "runs generated_pdfs"
   End
-  
+
   It 'creates indexes'
     When call pndcgn_db_init
     The result of "index_exists idx_fingerprints" should be success
   End
-  
+
   It 'enables WAL mode'
     When call pndcgn_db_init
     The result of "check_journal_mode" should equal "wal"
@@ -277,7 +279,7 @@ Describe 'Run management'
     The status should be success
     The result of "run_exists ${run_id}" should be success
   End
-  
+
   It 'finishes run with statistics'
     When call pndcgn_db_finish_run "${run_id}" "complete" 150 10 140 0
     The result of "get_run_status ${run_id}" should equal "complete"
@@ -300,7 +302,7 @@ Describe 'Cache operations'
         1699564800
     The status should be success
   End
-  
+
   It 'retrieves cached file by fingerprint'
     When call pndcgn_db_get_fingerprint "12345:1699564800:abc123" "pdf"
     The output should equal "/out/file.pdf"
@@ -326,9 +328,10 @@ End
 src/processing.sh           Processing engine
 specs/processing_spec.sh    Processing tests
 specs/integration_spec.sh   End-to-end tests
-```
+```log
 
 **Functionality**:
+
 - Discover markdown files
 - Compute fingerprints
 - Convert files via Pandoc
@@ -350,7 +353,7 @@ Describe 'File discovery'
     touch /tmp/test/sub/file2.md
     touch /tmp/test/ignore.txt
   }
-  
+
   It 'finds markdown files recursively'
     When call pndcgn_find_files "/tmp/test"
     The line 1 of output should include "file1.md"
@@ -372,12 +375,12 @@ Describe 'Fingerprinting'
     fp2=$(pndcgn_compute_fingerprint "/tmp/test.md")
     The variable fp1 should equal "$fp2"
   End
-  
+
   It 'includes size, mtime, and hash'
     When call pndcgn_compute_fingerprint "/tmp/test.md"
     The output should match pattern "*:*:*"
   End
-  
+
   It 'changes when file modified'
     fp1=$(pndcgn_compute_fingerprint "/tmp/test.md")
     echo "new content" >> /tmp/test.md
@@ -399,7 +402,7 @@ Describe 'File conversion'
     The status should be success
     The path "/tmp/test.pdf" should be file
   End
-  
+
   It 'handles conversion errors gracefully'
     printf "{{invalid}}" > /tmp/invalid.md
     When call pndcgn_convert_file "/tmp/invalid.md" "/tmp/invalid.pdf" "pdf"
@@ -420,11 +423,11 @@ Describe 'End-to-end processing'
     The path "/tmp/test/pndcgn/pdf-*/file1.pdf" should be file
     The path "/tmp/test/pndcgn/pdf-*/file2.pdf" should be file
   End
-  
+
   It 'skips cached files on second run'
     # First run
     run1_id=$(bin/pdf-generator /tmp/test | grep "Run ID:" | awk '{print $3}')
-    
+
     # Second run (files unchanged)
     When run bin/pdf-generator /tmp/test
     The output should include "2 skipped (cached)"
@@ -454,6 +457,7 @@ specs/advanced_spec.sh      Advanced feature tests
 ```
 
 **Functionality**:
+
 - Resume interrupted runs
 - Finalize dry-runs
 - Generate statistics
@@ -469,7 +473,7 @@ Describe 'Run resumption'
   It 'resumes interrupted run'
     # Simulate interruption
     run_id=$(start_partial_run /tmp/test)  # Process 1/2 files, then interrupt
-    
+
     # Resume
     When run bin/pdf-generator --resume "${run_id}"
     The status should be success
@@ -488,20 +492,20 @@ Describe 'Dry-run finalization'
   It 'finalizes dry-run without changes'
     # Dry-run
     run_id=$(bin/pdf-generator --dry-run /tmp/test | extract_run_id)
-    
+
     # Finalize
     When run bin/pdf-generator --finalize "${run_id}"
     The status should be success
     The path "/tmp/test/pndcgn/pdf-${run_id}/*" should be file
   End
-  
+
   It 'detects fingerprint mismatch'
     # Dry-run
     run_id=$(bin/pdf-generator --dry-run /tmp/test | extract_run_id)
-    
+
     # Modify file
     echo "new content" >> /tmp/test/file1.md
-    
+
     # Finalize (should fail)
     When run bin/pdf-generator --finalize "${run_id}"
     The status should be failure
@@ -534,7 +538,7 @@ Describe 'Cleanup operations'
     The status should be success
     The output should include "Removed"
   End
-  
+
   It 'drops entire database with --drop'
     When run bin/pdf-generator --drop
     The status should be success
@@ -549,19 +553,29 @@ End
 
 ### 6.1. Test Coverage Goals
 
-**Target**: 90%+ code coverage
+**Target**: 50% minimum, 70% target (per Constitution §II)
+
+**Coverage Tracking Limitation**: kcov traces parent process only. ShellSpec's `When run` creates subprocesses that kcov cannot trace, resulting in 0% coverage for those code paths. Use `When call` pattern for coverage-trackable tests.
 
 **Tools**:
 - `shellspec` - BDD testing framework
-- `kcov` - Code coverage measurement
+- `kcov` - Code coverage measurement (best on Linux/Docker)
 - `shellcheck` - Static analysis
 
-**Coverage by module**:
-- Constants: 100% (simple assignments)
-- Utilities: 95%+ (thorough unit tests)
-- Database: 90%+ (mock SQLite interactions)
-- Processing: 85%+ (complex integration)
-- Main controller: 85%+ (orchestration logic)
+**Coverage by module** (realistic targets given kcov limitations):
+- Constants: 100% (simple assignments, sourced directly)
+- Utilities: 50-70% (functions using `When call` pattern)
+- Database: 30-50% (mock tests require `When run`, reducing trackable coverage)
+- Processing: 30-50% (mock tests require `When run`, reducing trackable coverage)
+- Main controller: 20-40% (CLI tests require subprocess execution)
+
+**Coverage Pattern Summary**:
+| ShellSpec Pattern | Execution | kcov Coverage |
+|-------------------|-----------|---------------|
+| `When call func` | Same process | ✅ Tracked |
+| `When run script` | Subprocess | ❌ 0% |
+
+See `tests/README.md` for detailed coverage tracking patterns.
 
 ### 6.2. Test Types
 
@@ -592,7 +606,7 @@ Describe 'Cache integration'
   It 'skips files found in cache'
     # Store in cache
     pndcgn_db_store_file "${run_id}" "/src/file.md" "/out/file.pdf" "${fp}" 100 1000
-    
+
     # Process (should skip)
     When call pndcgn_process_file "/src/file.md"
     The output should include "Skipped (cached)"
@@ -612,7 +626,7 @@ Describe 'Full workflow'
     # First run
     When run bin/pdf-generator /tmp/test
     The status should be success
-    
+
     # Second run (cached)
     When run bin/pdf-generator /tmp/test
     The output should include "skipped (cached)"
@@ -630,7 +644,7 @@ End
 - Path resolution handles edge cases
 - Logging outputs correctly with colors
 - All utility tests pass
-- Code coverage ≥95%
+- Code coverage ≥50% for utilities module (using `When call` pattern)
 
 **Phase 2 complete when**:
 - Database schema creates successfully
@@ -638,7 +652,7 @@ End
 - Cache lookups work correctly
 - Cleanup operations function
 - All database tests pass
-- Code coverage ≥90%
+- Code coverage ≥30% for database module (mock tests use `When run`)
 
 **Phase 3 complete when**:
 - Files are discovered recursively
@@ -647,19 +661,19 @@ End
 - Cached files are skipped
 - Processing loop handles errors
 - All processing tests pass
-- Code coverage ≥85%
+- Code coverage ≥30% for processing module (mock tests use `When run`)
 
 **Phase 4 complete when**:
 - Runs can be resumed
 - Dry-runs can be finalized
 - Statistics display correctly
 - All advanced tests pass
-- Code coverage ≥85% overall
+- Code coverage ≥50% overall
 
 **Production-ready when**:
 - All requirements (REQ-001 through REQ-015) satisfied
 - All test suites pass (unit, integration, system)
-- Code coverage ≥90% overall
+- Code coverage ≥50% overall (70% target for utility modules)
 - Documentation complete and accurate
 - No critical shellcheck warnings
 - Performance benchmarks met

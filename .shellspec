@@ -1,7 +1,0 @@
---default-path tests
---shell bash
---color
---format documentation
---covdir tests.results/coverage
---kcov-options "--include-pattern=.sh"
---kcov-options "--exclude-pattern=spec"

@@ -21,8 +21,8 @@ Describe "Performance Benchmarks"
             echo "# Doc2" > test_source/doc2.md
 
             # Mock timing functions
-            local initial_time=100
-            local repeat_time=15
+            initial_time=100
+            repeat_time=15
 
             # Simulate timing difference
             When call test "$repeat_time" -lt "$((initial_time / 5))"
@@ -36,9 +36,9 @@ Describe "Performance Benchmarks"
             echo "# Doc" > test_source/doc.md
 
             # Mock statistics
-            local total=10
-            local processed=2
-            local skipped=8
+            total=10
+            processed=2
+            skipped=8
 
             When call test "$skipped" -gt "$processed"
             The status should be success

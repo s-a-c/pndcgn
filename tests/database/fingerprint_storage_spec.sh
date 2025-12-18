@@ -5,9 +5,6 @@
 # Compliant with [AGENTS.md](../../AGENTS.md)
 #
 # Description: Tests for database fingerprint storage functions
-# Coverage: Uses 'When run' because tests require subprocess isolation for sqlite3 mocking
-#           Coverage tracking is limited (0%) for these tests due to subprocess execution
-#           See tests/README.md for coverage tracking patterns
 
 . "${SHELLSPEC_PROJECT_ROOT:-$PWD}/tests/spec_helper.sh"
 
@@ -15,155 +12,90 @@ Describe "Database Fingerprint Storage"
 
     BeforeAll 'setup_test_env'
     AfterAll 'cleanup_test_env'
+    BeforeEach 'setup_db_file'
+    AfterEach 'cleanup_db_file'
 
     # T029c: Run fingerprint storage during dry-run
     Context "fingerprint storage"
         It "stores fingerprint for a run"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            store_fingerprint() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
 
-            local update_called=false
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *UPDATE*fingerprint*)
-                                [[ "$query" == *"test-fingerprint-123"* ]] && update_called=true
-                                return 0
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                # Create a run first
+                run_id=$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' 0)
+
+                # Store fingerprint
+                pndcgn_db_store_fingerprint "$run_id" 'test-fingerprint-123'
+
+                # Verify it was stored
+                db_file=$(pndcgn_get_db_path)
+                sqlite3 "$db_file" "SELECT fingerprint FROM runs WHERE run_id = '$run_id';"
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_store_fingerprint 'test-run-id' 'test-fingerprint-123'"
+            When call store_fingerprint
+            The stdout should eq "test-fingerprint-123"
             The status should be success
-
-            unset -f sqlite3
-            rm -rf test_state
         End
 
         It "retrieves stored fingerprint"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            retrieve_fingerprint() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
 
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*fingerprint*)
-                                echo "stored-fingerprint-abc"
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                # Create a run and store fingerprint
+                run_id=$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' 0)
+                pndcgn_db_store_fingerprint "$run_id" 'stored-fingerprint-abc'
+
+                # Retrieve it
+                pndcgn_db_get_fingerprint "$run_id"
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_get_fingerprint 'test-run-id'"
-            The output should eq "stored-fingerprint-abc"
+            When call retrieve_fingerprint
+            The stdout should eq "stored-fingerprint-abc"
             The status should be success
-
-            unset -f sqlite3
-            rm -rf test_state
         End
 
         It "returns failure when fingerprint not found"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            get_nonexistent_fingerprint() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
 
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*fingerprint*)
-                                return 1  # No result
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                # Try to get fingerprint for non-existent run
+                pndcgn_db_get_fingerprint 'nonexistent-run'
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_get_fingerprint 'nonexistent-run'"
+            When call get_nonexistent_fingerprint
             The status should be failure
-
-            unset -f sqlite3
-            rm -rf test_state
         End
 
         It "verifies run exists"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            verify_run_exists() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
 
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*COUNT*)
-                                echo "1"  # Run exists
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                # Create a run
+                run_id=$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' 0)
+
+                # Verify it exists
+                pndcgn_db_run_exists "$run_id"
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_run_exists 'test-run-id'"
+            When call verify_run_exists
             The status should be success
-
-            unset -f sqlite3
-            rm -rf test_state
         End
 
         It "returns failure when run does not exist"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            verify_nonexistent_run() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
 
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*COUNT*)
-                                echo "0"  # Run doesn't exist
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                # Try to verify non-existent run
+                pndcgn_db_run_exists 'nonexistent-run'
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_run_exists 'nonexistent-run'"
+            When call verify_nonexistent_run
             The status should be failure
-
-            unset -f sqlite3
-            rm -rf test_state
         End
     End
 End

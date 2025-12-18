@@ -2,6 +2,11 @@
 
 Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
+**Input**: Design documents from `/specs/001-sync-docs-spec/`
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
+
+**Organization**: Tasks are organized by user story to enable independent implementation and testing of each story.
+
 ---
 
 <details><summary>Table of Contents</summary>
@@ -56,16 +61,19 @@ Compliant with [AGENTS.md](../../AGENTS.md) v8734620507988c6a9e6316900bfc9ff6039
   - [16. Phase 11: NFR P4+ (Low Priority / Future)](#16-phase-11-nfr-p4-low-priority--future)
     - [16.1. Summary of P4+ Tasks (43 NFRs)](#161-summary-of-p4-tasks-43-nfrs)
     - [16.2. P4+ Placeholder Tasks](#162-p4-placeholder-tasks)
-  - [17. Task Summary](#17-task-summary)
+  - [17. Phase 12: Agent Context Updates](#17-phase-12-agent-context-updates)
+    - [17.1. Agent Context Update Tasks](#171-agent-context-update-tasks)
+  - [18. Phase 13: Documentation Finalization](#18-phase-13-documentation-finalization)
+    - [18.1. Documentation Update Tasks](#181-documentation-update-tasks)
+  - [19. Phase 14: Release Preparation \& Validation](#19-phase-14-release-preparation--validation)
+    - [19.1. Release Validation Tasks](#191-release-validation-tasks)
+    - [19.2. Quality Assurance Tasks](#192-quality-assurance-tasks)
+  - [20. Task Summary](#20-task-summary)
+  - [21. Requirement Traceability Matrix](#21-requirement-traceability-matrix)
 
 </details>
 
 ---
-
-**Input**: Design documents from `/specs/001-sync-docs-spec/`
-**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
-
-**Organization**: Tasks are organized by user story to enable independent implementation and testing of each story.
 
 ## 1. Format: `[ID] [P?] [Story] Description`
 
@@ -678,7 +686,84 @@ Task: "Implement pandoc conversion function pndcgn_convert_file() in src/process
 
 ---
 
-## 17. Task Summary
+## 17. Phase 12: Agent Context Updates
+
+**Purpose**: Update AI agent context files with project information from plan.md (per plan workflow Phase 1)
+
+**Note**: This phase should be executed after Phase 1 (Design & Contracts) is complete in the plan workflow, but can be run at any time to sync agent context files.
+
+### 17.1. Agent Context Update Tasks
+
+- [X] T183 [P] Run `.specify/scripts/bash/update-agent-context.sh cursor-agent` to update Cursor IDE agent context file
+- [X] T184 [P] Verify agent context file contains correct project structure, tech stack, and recent changes from plan.md
+- [X] T185 [P] Review and validate agent context file preserves manual additions between markers (if any)
+- [X] T186 [P] Document any manual agent context customizations that should be preserved in future updates
+
+**Checkpoint**: Agent context files are synchronized with current plan.md state
+
+---
+
+## 18. Phase 13: Documentation Finalization
+
+**Purpose**: Update user-facing documentation to reflect implemented features and ensure consistency with specification
+
+**Reference**: See `docs/` directory structure in plan.md and spec.md documentation requirements
+
+### 18.1. Documentation Update Tasks
+
+- [X] T187 [P] Update `docs/010-overview.md` with current feature set and capabilities
+- [X] T188 [P] Update `docs/020-requirements.md` to mark implemented requirements (REQ-XXX → Implementation status)
+- [X] T189 [P] Update `docs/040-user-guide.md` with actual CLI usage examples and workflow descriptions
+- [X] T190 [P] Update `docs/050-technical-specification.md` with implemented architecture and design decisions
+- [X] T191 [P] Update `docs/060-database-schema.md` with actual schema from implemented database.sh
+- [X] T192 [P] Update `docs/070-api-reference.md` with actual function signatures from implemented source files
+- [X] T193 [P] Update `docs/080-output-formats.md` with supported output types and format details
+- [X] T194 [P] Update `docs/100-system-test-plan.md` with test execution results and coverage metrics
+- [X] T195 [P] Validate all documentation links are working and paths are correct
+- [X] T196 [P] Ensure all code examples in documentation match actual implementation
+- [X] T197 [P] Add troubleshooting section to user guide based on common edge cases and error scenarios
+- [X] T198 [P] Update changelog (CHANGELOG.md or docs/900-changelog.md) with feature additions and changes
+
+**Checkpoint**: All user-facing documentation is accurate and reflects current implementation
+
+---
+
+## 19. Phase 14: Release Preparation & Validation
+
+**Purpose**: Final validation, packaging, and release readiness checks
+
+### 19.1. Release Validation Tasks
+
+- [ ] T199 [P] Run full test suite and verify all tests pass: `shellspec`
+- [ ] T200 [P] Verify code coverage meets minimum 50% threshold (70% for utilities) using kcov/ShellSpec reporting
+- [ ] T201 [P] Run ShellCheck validation on all shell scripts and fix any warnings: `shellcheck bin/* src/**/*.sh`
+- [ ] T202 [P] Validate all success criteria from spec.md (SC-001 through SC-004) with performance benchmarks
+- [ ] T203 [P] Test installation and usage from a clean environment (no existing state files)
+- [ ] T204 [P] Test upgrade path from previous version (if applicable) - verify database migrations work correctly
+- [ ] T205 [P] Create release notes summarizing new features, improvements, and breaking changes (if any)
+- [ ] T206 [P] Verify man page installation and content (if man page exists)
+- [ ] T207 [P] Test on multiple platforms (Linux, macOS) if available
+- [ ] T208 [P] Create distribution package or installation script (if applicable)
+- [ ] T209 [P] Update version numbers in all relevant files (bin/pndcgn, constants.sh, plan.md, etc.)
+
+### 19.2. Quality Assurance Tasks
+
+- [ ] T210 [P] Perform manual smoke testing of all user stories with representative projects
+- [ ] T211 [P] Validate error messages are clear and actionable for common failure scenarios
+- [ ] T212 [P] Test concurrent run scenarios to verify SQLite WAL mode handles multiple simultaneous runs
+- [ ] T213 [P] Test dry-run → finalize workflow with various input change scenarios
+- [ ] T214 [P] Test resume functionality with interrupted runs and validate checkpoint recovery
+- [ ] T215 [P] Verify all edge cases from spec.md NFR-EDGE section are handled correctly
+- [ ] T216 [P] Test TOML configuration parsing with various valid and invalid configurations
+- [ ] T217 [P] Verify .pndcgnignore seeding and reseeding behavior matches specification
+- [ ] T218 [P] Test fzf integration (if available) and fallback behavior
+- [ ] T219 [P] Test sqlite-ulid extension download, installation, and Bash fallback scenarios
+
+**Checkpoint**: All release validation checks pass, product is ready for distribution
+
+---
+
+## 20. Task Summary
 
 | Phase | Count | Status |
 |-------|-------|--------|
@@ -693,6 +778,49 @@ Task: "Implement pandoc conversion function pndcgn_convert_file() in src/process
 | **Phase 9: NFR P2** | **97** | ✅ Complete |
 | **Phase 10: NFR P3** | **27** | ✅ Complete |
 | **Phase 11: NFR P4+** | **6** | ✅ Complete |
-| **Total** | **283** | ✅ Complete |
+| **Phase 12: Agent Context Updates** | **4** | ✅ Complete |
+| **Phase 13: Documentation Finalization** | **12** | ✅ Complete |
+| **Phase 14: Release Preparation & Validation** | **21** | ⏳ Pending |
+| **Total** | **320** | **299 Complete, 21 Pending** |
+
+---
+
+## 21. Requirement Traceability Matrix
+
+**Purpose**: Explicit mapping of Functional Requirements (FR-XXX) to User Stories, Test Tasks, and Implementation Tasks per Constitution §III (Traceability).
+
+| FR-ID | Requirement Summary | User Story | Test Tasks | Implementation Tasks | Status |
+|-------|-------------------|------------|------------|---------------------|--------|
+| FR-001 | Primary CLI entrypoint `pndcgn` | US1 | T014a | T004 | ✅ Complete |
+| FR-002 | Optional source directory with fzf | US1 | T014a, T014b | T014, T015 | ✅ Complete |
+| FR-003 | Optional target directory | US1 | T014a | T014 | ✅ Complete |
+| FR-004 | Output type option (`--type`) | US1 | T014a | T014 | ✅ Complete |
+| FR-004A | Configurable include patterns (TOML) | US1 | T049a, T049b | T051 | ✅ Complete |
+| FR-004B | `.pndcgnignore` support | US1 | T014c, T014d | T016, T017 | ✅ Complete |
+| FR-005 | Run creation with unique ID | US1 | T014g | T020 | ✅ Complete |
+| FR-006 | Run directory structure `${TARGET_DIR}/.pndcgn/${TYPE}-${RUN_ID}/` | US1 | T014k | T024 | ✅ Complete |
+| FR-007 | Run index artifact `_index.md` | US1 | T014l | T025 | ✅ Complete |
+| FR-008 | Human-browsable naming scheme (Dewey Decimal) | US1 | T014j | T023 | ✅ Complete |
+| FR-009 | Detect unchanged inputs (fingerprinting) | US1 | T014f | T019 | ✅ Complete |
+| FR-010 | Faster repeat runs with progress reporting | US1 | T014n | T026 | ✅ Complete |
+| FR-011 | Resume interrupted run | US3 | T037b, T037c | T038, T039 | ✅ Complete |
+| FR-012 | Dry-run mode | US2 | T029a | T029 | ✅ Complete |
+| FR-013 | Finalize dry-run | US2 | T029d | T032 | ✅ Complete |
+| FR-014 | Finalize validation (fingerprint check) | US2 | T029e, T029f, T029g | T030, T033, T034, T035 | ✅ Complete |
+| FR-015 | Prerequisite validation and error messages | US1 | T014p, T049e, T049f, T049g | T012, T028 | ✅ Complete |
+| FR-016 | Safe destructive operations (confirmation) | US3 | T037e, T037f, T037h | T041, T042, T044 | ✅ Complete |
+| FR-017 | Consistent product name "pndcgn" | US1 | T014a | T055 | ✅ Complete |
+| FR-018 | ULID-based run identifiers | US1 | T014g | T020, T007, T008 | ✅ Complete |
+| FR-019 | Error handling (stderr, exit codes, recovery) | US1 | T014p | T028 | ✅ Complete |
+
+**Legend**:
+
+- **FR-ID**: Functional Requirement identifier from spec.md
+- **User Story**: US1, US2, or US3 from spec.md User Scenarios
+- **Test Tasks**: ShellSpec test tasks (must fail before implementation)
+- **Implementation Tasks**: Implementation tasks in tasks.md
+- **Status**: Current completion status
+
+**Note**: This mapping satisfies Constitution §III requirement for "REQ-XXX → TEST-XXX → Implementation mapping". Success Criteria (SC-001 through SC-004) are validated in Phase 7 (T062-T065).
 
 ---

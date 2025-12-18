@@ -9,18 +9,29 @@
 Describe "Shared Constants Contract (src/constants.sh)"
 
     Context "when the constants file is sourced"
+        # Unset NO_COLOR to test actual constant values
+        BeforeAll 'unset NO_COLOR'
 
         It "defines the B_RED constant correctly"
             # The value should be the combination of BOLD and RED.
             # We use `eq` for an exact string match.
+            # Re-source constants without NO_COLOR
+            unset NO_COLOR
+            . "${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/constants.sh"
             The value "$B_RED" should eq "${BOLD}${RED}"
         End
 
         It "defines the RESET constant correctly"
+            # Re-source constants without NO_COLOR
+            unset NO_COLOR
+            . "${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/constants.sh"
             The value "$RESET" should eq "${CSI}0m"
         End
 
         It "ensures constants are not empty"
+            # Re-source constants without NO_COLOR
+            unset NO_COLOR
+            . "${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/constants.sh"
             The value "$CSI" should not eq ""
             The value "$RED" should not eq ""
             The value "$BOLD" should not eq ""

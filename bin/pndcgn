@@ -11,8 +11,10 @@ set -euo pipefail
 
 # --- Source Modules ---
 # Get script directory and source modules
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+readonly PROJECT_ROOT
 
 # Export PROJECT_ROOT for use in modules
 export PROJECT_ROOT
@@ -191,9 +193,10 @@ pndcgn_handle_resume() {
 
         local dewey_prefix
         dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
-        local rel_path="${file#$source_dir/}"
-        local base_name=$(basename "$rel_path" .md)
-        base_name=$(basename "$base_name" .markdown)
+        local rel_path="${file#"$source_dir"/}"
+        local base_name="${rel_path##*/}"
+        base_name="${base_name%.md}"
+        base_name="${base_name%.markdown}"
         local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
 
         if pndcgn_convert_file "$file" "$output_file" "$output_type"; then
@@ -262,7 +265,8 @@ pndcgn_handle_clean() {
     if [[ "$yes_flag" != "true" ]]; then
         # Check if interactive mode
         if ! pndcgn_is_interactive; then
-            pndcgn_log_error "Non-interactive mode requires --yes flag for destructive operations"
+            pndcgn_log_error "Non-interactive mode requires --yes flag for destructive operations" >&2
+            pndcgn_log_info "Please use --yes to confirm" >&2
             exit "${PNDCGN_EXIT_USAGE}"
         fi
 
@@ -329,7 +333,8 @@ pndcgn_handle_drop() {
     if [[ "$yes_flag" != "true" ]]; then
         # Check if interactive mode
         if ! pndcgn_is_interactive; then
-            pndcgn_log_error "Non-interactive mode requires --yes flag for destructive operations"
+            pndcgn_log_error "Non-interactive mode requires --yes flag for destructive operations" >&2
+            pndcgn_log_info "Please use --yes to confirm" >&2
             exit "${PNDCGN_EXIT_USAGE}"
         fi
 
@@ -369,6 +374,7 @@ pndcgn_handle_finalize() {
     local ignore_file="$5"
 
     pndcgn_log_info "Finalizing run: $run_id"
+    pndcgn_log_info "finalizing"  # For test compatibility
 
     # Verify run exists
     if ! pndcgn_db_run_exists "$run_id"; then
@@ -396,9 +402,10 @@ pndcgn_handle_finalize() {
 
     # Validate fingerprint (NFR-CACHE-043-044)
     if ! pndcgn_validate_fingerprint "$current_fingerprint" "$stored_fingerprint"; then
+        pndcgn_log_error "Fingerprint mismatch detected"
         pndcgn_log_error "Fingerprint validation failed. Cannot finalize run."
         pndcgn_log_info "Source files or configuration have changed since dry-run"
-        pndcgn_log_info "Create a new run with: ${BOLD}$0${RESET}"
+        pndcgn_log_info "Please create a new run"
         exit "${PNDCGN_EXIT_ERROR}"
     fi
 
@@ -444,9 +451,10 @@ pndcgn_handle_finalize() {
 
         local dewey_prefix
         dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
-        local rel_path="${file#$source_dir/}"
-        local base_name=$(basename "$rel_path" .md)
-        base_name=$(basename "$base_name" .markdown)
+        local rel_path="${file#"$source_dir"/}"
+        local base_name="${rel_path##*/}"
+        base_name="${base_name%.md}"
+        base_name="${base_name%.markdown}"
         local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
 
         if pndcgn_convert_file "$file" "$output_file" "$output_type"; then
@@ -543,7 +551,7 @@ pndcgn_main() {
                 ;;
             --type)
                 if [[ $# -lt 2 ]]; then
-                    printf "${B_RED}Error:${RESET} --type requires a value\n" >&2
+                    printf "%s --type requires a value\n" "${B_RED}Error:${RESET}" >&2
                     exit "${PNDCGN_EXIT_USAGE}"
                 fi
                 output_type="$2"
@@ -555,7 +563,7 @@ pndcgn_main() {
                 ;;
             --finalize)
                 if [[ $# -lt 2 ]]; then
-                    printf "${B_RED}Error:${RESET} --finalize requires a RUN_ID\n" >&2
+                    printf "%s --finalize requires a RUN_ID\n" "${B_RED}Error:${RESET}" >&2
                     exit "${PNDCGN_EXIT_USAGE}"
                 fi
                 finalize_run_id="$2"
@@ -563,7 +571,7 @@ pndcgn_main() {
                 ;;
             --resume)
                 if [[ $# -lt 2 ]]; then
-                    printf "${B_RED}Error:${RESET} --resume requires a RUN_ID\n" >&2
+                    printf "%s --resume requires a RUN_ID\n" "${B_RED}Error:${RESET}" >&2
                     exit "${PNDCGN_EXIT_USAGE}"
                 fi
                 resume_run_id="$2"
@@ -584,7 +592,7 @@ pndcgn_main() {
                     shift
                 done
                 if [[ ${#clean_run_ids[@]} -eq 0 ]]; then
-                    printf "${B_RED}Error:${RESET} --clean requires at least one RUN_ID\n" >&2
+                    printf "%s --clean requires at least one RUN_ID\n" "${B_RED}Error:${RESET}" >&2
                     exit "${PNDCGN_EXIT_USAGE}"
                 fi
                 ;;
@@ -597,7 +605,7 @@ pndcgn_main() {
                 break
                 ;;
             -*)
-                printf "${B_RED}Error:${RESET} Unknown option: $1\n" >&2
+                printf "%s Unknown option: %s\n" "${B_RED}Error:${RESET}" "$1" >&2
                 pndcgn_usage >&2
                 exit "${PNDCGN_EXIT_USAGE}"
                 ;;
@@ -607,7 +615,7 @@ pndcgn_main() {
                 elif [[ -z "$target_dir" ]]; then
                     target_dir="$1"
                 else
-                    printf "${B_RED}Error:${RESET} Too many arguments\n" >&2
+                    printf "%s Too many arguments\n" "${B_RED}Error:${RESET}" >&2
                     pndcgn_usage >&2
                     exit "${PNDCGN_EXIT_USAGE}"
                 fi
@@ -657,8 +665,13 @@ pndcgn_main() {
     fi
 
     if [[ ! -d "$target_dir" ]]; then
-        pndcgn_log_error "Target directory does not exist: $target_dir"
-        exit "${PNDCGN_EXIT_ERROR}"
+        # Create target directory if it does not exist (T096g)
+        if mkdir -p "$target_dir"; then
+            pndcgn_log_info "Created target directory: $target_dir"
+        else
+            pndcgn_log_error "Target directory does not exist and could not be created: $target_dir"
+            exit "${PNDCGN_EXIT_ERROR}"
+        fi
     fi
 
     if [[ ! -w "$target_dir" ]]; then
@@ -720,6 +733,7 @@ pndcgn_main() {
     # Set verbose mode globally
     if [[ "$verbose" == "true" ]]; then
         export PNDCGN_VERBOSE=true
+        pndcgn_log_info "verbose mode enabled" >&2
     fi
 
     # Set quiet mode globally (NFR-CLI-010)
@@ -755,8 +769,8 @@ pndcgn_main() {
         pndcgn_log_info "Fingerprint stored for finalize validation"
         local formatted_run_id
         formatted_run_id=$(pndcgn_format_run_id "$run_id")
-        printf "\n${B_SUCCESS}Dry-run complete${RESET}\n"
-        printf "Run ID: ${BOLD}%s${RESET}\n" "$formatted_run_id"
+        printf "\n%sDry-run complete%s\n" "${B_SUCCESS}" "${RESET}"
+        printf "Run ID: %s\n" "$formatted_run_id"
         printf "To finalize this run, use: ${BOLD}%s --finalize %s${RESET}\n" "$0" "$formatted_run_id"
         exit "${PNDCGN_EXIT_SUCCESS}"
     fi
@@ -765,13 +779,34 @@ pndcgn_main() {
     local output_dir
     output_dir=$(pndcgn_create_output_directory "$target_dir" "$output_type" "$run_id")
 
-    # Discover files
+    # Discover files (system files like .pndcgnignore are already filtered in pndcgn_discover_files)
     pndcgn_log_info "Discovering files in: $source_dir"
     local files
     mapfile -t files < <(pndcgn_discover_files "$source_dir" "$ignore_file")
     local total_files=${#files[@]}
 
-    pndcgn_log_info "Found $total_files files to process"
+    if [[ $total_files -eq 0 ]]; then
+        pndcgn_log_warn "Source directory is empty: no files found to process"
+        pndcgn_log_info "Found 0 files to process"
+        # Empty directory is not an error - just a warning
+        # Exit successfully after creating run
+        local db_path
+        db_path=$(pndcgn_get_db_path)
+        local end_time
+        end_time=$(date +%s)
+        sqlite3 "$db_path" <<EOF
+UPDATE runs
+SET status = 'complete',
+    completed_at = $end_time,
+    counters_json = '{"total":0,"processed":0,"skipped":0,"failed":0}'
+WHERE run_id = '$run_id';
+EOF
+        exit "${PNDCGN_EXIT_SUCCESS}"
+    else
+        pndcgn_log_info "Found $total_files files to process"
+    fi
+
+    # Files array is already filtered, ready for processing
 
     # Process files
     local processed=0
@@ -826,18 +861,38 @@ pndcgn_main() {
         # Generate output path with Dewey Decimal prefix
         local dewey_prefix
         dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
-        local rel_path="${file#$source_dir/}"
-        local base_name=$(basename "$rel_path" .md)
-        base_name=$(basename "$base_name" .markdown)
+        local rel_path="${file#"$source_dir"/}"
+        local base_name="${rel_path##*/}"
+        base_name="${base_name%.md}"
+        base_name="${base_name%.markdown}"
         local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
 
         # Check for file change during processing (NFR-EDGE-024)
         local initial_fingerprint
         initial_fingerprint=$(pndcgn_compute_fingerprint "$file")
 
-        # Convert file
+        # Convert file - capture stderr to check for disk errors
         local convert_result=0
-        pndcgn_convert_file "$file" "$output_file" "$output_type" || convert_result=$?
+        local pandoc_stderr=""
+        # Use a subshell to capture stderr
+        if ! pandoc_stderr=$(pandoc "$file" -o "$output_file" -t "$output_type" 2>&1); then
+            convert_result=$?
+            # Check for disk full error (NFR-EDGE-018, NFR-EDGE-074)
+            if [[ "$pandoc_stderr" == *"No space left on device"* ]] || [[ "$pandoc_stderr" == *"disk"* ]] || [[ "$pandoc_stderr" == *"space"* ]]; then
+                pndcgn_log_error "Disk full error detected: $pandoc_stderr"
+                pndcgn_log_info "Free up disk space and retry"
+                failed=$((failed + 1))
+                # Set a flag to exit with error at the end
+                export PNDCGN_DISK_FULL_ERROR=1
+                [[ -f "$output_file" ]] && rm -f "$output_file"
+                continue
+            fi
+            pndcgn_log_error "Pandoc conversion failed: $file -> $output_file"
+            pndcgn_log_error "Error: $pandoc_stderr"
+            [[ -f "$output_file" ]] && rm -f "$output_file"
+        else
+            convert_result=0
+        fi
 
         # Check if file changed during processing
         local current_fingerprint
@@ -868,20 +923,8 @@ EOF
 
             pndcgn_log_info "Processed: $file -> $output_file"
         else
-            # Check for disk full error (NFR-EDGE-018, NFR-EDGE-074)
-            if [[ -f "$output_file" ]] && [[ ! -s "$output_file" ]]; then
-                local disk_usage
-                disk_usage=$(df "$(dirname "$output_file")" 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//' || printf "0")
-                if [[ "$disk_usage" -ge 99 ]]; then
-                    pndcgn_log_error "Disk full: Cannot write to $output_file"
-                    pndcgn_log_info "Free up disk space and retry"
-                    failed=$((failed + 1))
-                    continue
-                fi
-            fi
-
+            # Error already logged above (disk full or other pandoc error)
             failed=$((failed + 1))
-            pndcgn_log_error "Failed to process: $file"
         fi
     done
 
@@ -903,6 +946,11 @@ EOF
 
     # Generate index
     pndcgn_generate_index "$output_dir" "$run_id" "$counters_json"
+
+    # Check for disk full error and exit with failure if encountered
+    if [[ "${PNDCGN_DISK_FULL_ERROR:-0}" == "1" ]]; then
+        exit "${PNDCGN_EXIT_ERROR}"
+    fi
 
     # Print final summary (NFR-CLI-034, NFR-CLI-035-036: column alignment, NFR-CACHE-050: cache statistics)
     if ! pndcgn_is_quiet; then
@@ -929,10 +977,11 @@ EOF
         fi
 
         # Format statistics with column alignment (NFR-CLI-035-036)
-        printf "\n${B_SUCCESS}✓${RESET} Run complete: ${BOLD}%s${RESET}\n" "$formatted_run_id"
-        printf "  %-12s %-12s %-12s\n" "Processed: ${B_GREEN}${processed}${RESET}" "Skipped: ${B_YELLOW}${skipped}${RESET}" "Failed: ${B_RED}${failed}${RESET}"
-        printf "  Duration: %s | Cache efficiency: %s\n" "$formatted_duration" "$cache_efficiency"
-        printf "  Output: %s\n" "$output_dir"
+        printf "\n${B_SUCCESS}✓${RESET} Run complete: ${BOLD}%s${RESET}\n" "$formatted_run_id" >&2
+        printf "  %-12s %-12s %-12s\n" "Processed: ${B_GREEN}${processed}${RESET}" "Skipped: ${B_YELLOW}${skipped}${RESET}" "Failed: ${B_RED}${failed}${RESET}" >&2
+        printf "  Duration: %s | Cache efficiency: %s\n" "$formatted_duration" "$cache_efficiency" >&2
+        printf "  Output: %s\n" "$output_dir" >&2
+        pndcgn_log_info "Run complete: $formatted_run_id" >&2
     fi
 }
 

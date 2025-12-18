@@ -40,11 +40,31 @@ pndcgn_discover_files() {
         fi
     fi
 
+    # Initialize allowed extensions from config or use defaults
+    local allowed_extensions=()
+    if [[ -n "$config_file" ]] && [[ -f "$config_file" ]]; then
+        local extensions_str
+        extensions_str=$(pndcgn_parse_toml_extensions "$config_file" 2>/dev/null || printf "")
+        if [[ -n "$extensions_str" ]]; then
+            # Convert space-separated string to array
+            read -r -a allowed_extensions <<< "$extensions_str"
+        fi
+    fi
+    # Default extensions if not specified in config (NFR-TOML-060)
+    if [[ ${#allowed_extensions[@]} -eq 0 ]]; then
+        allowed_extensions=(md markdown txt rst org html htm tex)
+    fi
+
     local files=()
     local file
 
     # Find all markdown and text files (NFR-EDGE-007-009: symlink handling)
     while IFS= read -r -d '' file; do
+        # Skip empty file paths
+        if [[ -z "$file" ]]; then
+            continue
+        fi
+
         # Skip broken symlinks (NFR-EDGE-008)
         if [[ -L "$file" ]] && [[ ! -e "$file" ]]; then
             continue
@@ -53,7 +73,7 @@ pndcgn_discover_files() {
         # Follow symlinks (NFR-EDGE-007) - resolve to actual file
         if [[ -L "$file" ]]; then
             local resolved_file
-            resolved_file=$(readlink -f "$file" 2>/dev/null || readlink "$file" 2>/dev/null || printf "$file")
+                        resolved_file=$(readlink -f "$file" 2>/dev/null || readlink "$file" 2>/dev/null || printf "%s" "$file")
             # Check for circular symlinks (NFR-EDGE-009)
             if [[ "$resolved_file" == "$file" ]] || [[ -z "$resolved_file" ]]; then
                 continue  # Circular or invalid symlink
@@ -61,10 +81,35 @@ pndcgn_discover_files() {
             file="$resolved_file"
         fi
 
+        # Get base name for extension and system file checks
+        local base_name="${file##*/}"
+
+        # Skip system files that should never be processed (e.g., .pndcgnignore, .pndcgn)
+        # Check base name first (most efficient) - this must come before extension checks
+        if [[ "$base_name" == ".pndcgnignore" ]] || \
+           [[ "$base_name" == ".pndcgn" ]] || \
+           [[ "$file" == *"/.pndcgn/"* ]]; then
+            continue
+        fi
+        # Skip ignore file itself if provided (check both absolute and relative paths)
+        if [[ -n "$ignore_file" ]]; then
+            # Normalize paths for comparison (handle both absolute and relative)
+            local file_normalized="$file"
+            local ignore_file_normalized="$ignore_file"
+            # Remove trailing slashes if any
+            file_normalized="${file_normalized%/}"
+            ignore_file_normalized="${ignore_file_normalized%/}"
+            # Compare normalized paths
+            if [[ "$file_normalized" == "$ignore_file_normalized" ]] || \
+               [[ "$file" == "$ignore_file" ]] || \
+               [[ "${file_normalized##*/}" == "${ignore_file_normalized##*/}" ]] && [[ "${ignore_file_normalized##*/}" == ".pndcgnignore" ]]; then
+                continue
+            fi
+        fi
+
         # Check file extension against allowed extensions (case-insensitive - NFR-TOML-017)
         # Support compound extensions (NFR-TOML-018: e.g., .md.txt, .markdown.bak)
         local file_ext
-        local base_name="${file##*/}"
         # Try compound extensions first (longest match)
         ext_match=false
         for allowed_ext in "${allowed_extensions[@]}"; do
@@ -95,7 +140,7 @@ pndcgn_discover_files() {
             local matches_include=false
             local pattern
             # Get relative path from source_root
-            local rel_path="${file#$source_root/}"
+                        local rel_path="${file#"$source_root"/}"
             # Ensure source_root is removed (handle trailing slash)
             rel_path="${rel_path#/}"
 
@@ -175,7 +220,10 @@ pndcgn_discover_files() {
     done < <(find "$source_root" -type f -print0 2>/dev/null)
 
     # Output files (one per line for easy parsing)
-    printf "%s\n" "${files[@]}"
+    # Only output if there are files (avoid empty line for empty array)
+    if [[ ${#files[@]} -gt 0 ]]; then
+        printf "%s\n" "${files[@]}"
+    fi
 }
 
 # --- Fingerprint Computation ---
@@ -354,6 +402,8 @@ pndcgn_convert_file() {
         pndcgn_log_error "Pandoc conversion failed: $source_file -> $output_file"
         if [[ -n "$pandoc_output" ]]; then
             pndcgn_log_error "Pandoc error: $pandoc_output"
+            # Output error to stderr for caller to capture
+            printf "%s\n" "$pandoc_output" >&2
         fi
         # Clean up partial output
         [[ -f "$output_file" ]] && rm -f "$output_file"
@@ -384,10 +434,11 @@ pndcgn_dewey_prefix() {
     local source_root="$2"
 
     # Get relative path from source root
-    local rel_path="${file_path#$source_root/}"
+        local rel_path="${file_path#"$source_root"/}"
 
     # Extract directory components
-    local dir_path=$(dirname "$rel_path")
+        local dir_path
+    dir_path=$(dirname "$rel_path")
 
     # Generate Dewey Decimal prefix from directory structure
     # Format: 001.002.003 (one number per directory level)
@@ -507,9 +558,9 @@ EOF
 
     # List all generated artifacts
     find "$output_dir" -type f \( -name "*.pdf" -o -name "*.html" -o -name "*.epub" \) | sort | while read -r artifact; do
-        local rel_path="${artifact#$output_dir/}"
+                local rel_path="${artifact#"$output_dir"/}"
         local basename
-        basename=$(basename "$artifact")
+        basename="${artifact##*/}"
         # Use printf with explicit format to avoid option parsing issues
         printf -- "- [%s](%s)\n" "$basename" "$rel_path" >> "$index_file"
     done

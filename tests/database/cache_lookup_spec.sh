@@ -5,9 +5,8 @@
 # Compliant with [AGENTS.md](../../AGENTS.md)
 #
 # Description: Tests for database cache lookup functions
-# Coverage: Uses 'When run' because tests require subprocess isolation for sqlite3 mocking
-#           Coverage tracking is limited (0%) for these tests due to subprocess execution
-#           See tests/README.md for coverage tracking patterns
+# Coverage: Uses real SQLite database for accurate testing and coverage tracking
+#           Tests use actual database operations instead of mocking
 
 . "${SHELLSPEC_PROJECT_ROOT:-$PWD}/tests/spec_helper.sh"
 
@@ -18,129 +17,106 @@ Describe "Database Cache Lookup"
 
     # T014h: Cache lookup function
     Context "cache lookup"
+        BeforeEach 'setup_db_file'
+        AfterEach 'cleanup_db_file'
+
         It "finds cached artifact with matching fingerprint"
-            mkdir -p test_state test_output
-            local cached_file="$PWD/test_output/cached.pdf"
-            # Create the cached file first
-            echo "cached content" > "$cached_file"
-            export XDG_STATE_HOME="$PWD/test_state"
-            # Create dummy db file so existence check passes
-            mkdir -p test_state
-            touch test_state/pndcgn.db
+            cache_lookup_hit() {
+                local work_dir
+                work_dir=$(pwd)
+                mkdir -p test_output
+                cached_file="$work_dir/test_output/cached.pdf"
+                # Create the cached file first
+                echo "cached content" > "$cached_file"
 
-            sqlite3() {
-                local db_file="${1:-}"
-                # Read query from stdin (heredoc)
-                local query
-                query=$(cat)
-                case "$db_file" in
-                    *pndcgn.db)
-                        if [[ "$query" == *"SELECT output_path"* ]]; then
-                            # Return the cached file path
-                            echo "$cached_file"
-                            return 0
-                        fi
-                        ;;
-                esac
-                return 1
+                # Initialize database with schema in this process
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
+
+                # Insert test data: a complete run with a cached artifact
+                run_id=$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0')
+                pndcgn_db_update_run_status "$run_id" 'complete'
+
+                local db_file
+                db_file=$(pndcgn_get_db_path)
+                sqlite3 "$db_file" <<EOF
+UPDATE runs SET status = 'complete' WHERE run_id = '$run_id';
+INSERT INTO generated_artifacts (run_id, source_path, output_path, input_fingerprint, output_fingerprint, output_type)
+VALUES ('$run_id', '/tmp/source/file.md', '$cached_file', 'fingerprint123', 'output-fp-123', 'pdf');
+EOF
+
+                pndcgn_db_check_cache '/tmp/source/file.md' 'fingerprint123' 'pdf'
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_check_cache '/tmp/source/file.md' 'fingerprint123' 'pdf'"
-            The output should eq "$cached_file"
+            When call cache_lookup_hit
+            The stdout should match pattern "*/test_output/cached.pdf"
             The status should be success
 
-            unset -f sqlite3
-            rm -rf test_state test_output
+            rm -rf test_output
         End
 
         It "returns failure when cache miss"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
-
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*output_path*)
-                                return 1  # No match
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+            cache_lookup_miss() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
+                pndcgn_db_check_cache '/tmp/source/file.md' 'new-fingerprint' 'pdf'
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_check_cache '/tmp/source/file.md' 'new-fingerprint' 'pdf'"
+            When call cache_lookup_miss
             The status should be failure
-
-            unset -f sqlite3
-            rm -rf test_state
         End
 
         It "validates cached file exists"
-            mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            cache_lookup_missing_file() {
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
 
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*output_path*)
-                                echo "/nonexistent/file.pdf"
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                local db_file
+                db_file=$(pndcgn_get_db_path)
+
+                run_id=$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0')
+                sqlite3 "$db_file" <<EOF
+UPDATE runs SET status = 'complete' WHERE run_id = '$run_id';
+INSERT INTO generated_artifacts (run_id, source_path, output_path, input_fingerprint, output_fingerprint, output_type)
+VALUES ('$run_id', '/tmp/source/file.md', '/nonexistent/file.pdf', 'fingerprint', 'output-fp', 'pdf');
+EOF
+
+                pndcgn_db_check_cache '/tmp/source/file.md' 'fingerprint' 'pdf'
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_check_cache '/tmp/source/file.md' 'fingerprint' 'pdf'"
+            When call cache_lookup_missing_file
             The status should be failure  # File doesn't exist
-
-            unset -f sqlite3
-            rm -rf test_state
         End
 
         It "matches by output type"
-            mkdir -p test_state test_output
-            echo "content" > test_output/file.pdf
-            export XDG_STATE_HOME="$PWD/test_state"
+            cache_lookup_by_type() {
+                local work_dir
+                work_dir=$(pwd)
+                mkdir -p test_output
+                cached_file="$work_dir/test_output/file.pdf"
+                echo "content" > "$cached_file"
 
-            sqlite3() {
-                local db_file="${1:-}"
-                local query="${2:-}"
-                case "$db_file" in
-                    *pndcgn.db)
-                        case "$query" in
-                            *SELECT*output_path*)
-                                # Should only match if output_type matches
-                                [[ "$query" == *"output_type = 'pdf'"* ]] && echo "$PWD/test_output/file.pdf"
-                                ;;
-                            "")
-                                return 0
-                                ;;
-                        esac
-                        ;;
-                esac
+                source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+                pndcgn_db_init >/dev/null 2>&1 || true
+
+                local db_file
+                db_file=$(pndcgn_get_db_path)
+
+                run_id=$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0')
+                sqlite3 "$db_file" <<EOF
+UPDATE runs SET status = 'complete' WHERE run_id = '$run_id';
+INSERT INTO generated_artifacts (run_id, source_path, output_path, input_fingerprint, output_fingerprint, output_type)
+VALUES ('$run_id', '/tmp/file.md', '$cached_file', 'fp123', 'output-fp', 'pdf');
+EOF
+
+                pndcgn_db_check_cache '/tmp/file.md' 'fp123' 'pdf'
             }
-            export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_check_cache '/tmp/file.md' 'fp123' 'pdf'"
+            When call cache_lookup_by_type
+            The stdout should match pattern "*/test_output/file.pdf"
             The status should be success
 
-            unset -f sqlite3
-            rm -rf test_state test_output
+            rm -rf test_output
         End
     End
 End

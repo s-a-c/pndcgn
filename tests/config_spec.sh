@@ -39,7 +39,11 @@ Describe "TOML Configuration File Discovery and Parsing"
             echo 'patterns = ["custom/**/*.md"]' >> "$source_dir/pndcgn.toml"
 
             When call pndcgn_discover_config_file "$source_dir"
-            The output should eq "$source_dir/pndcgn.toml"
+            # Normalize path to handle symlinks (e.g., /var -> /private/var on macOS)
+            local expected_path actual_path
+            expected_path=$(readlink -f "$source_dir/pndcgn.toml" 2>/dev/null || echo "$source_dir/pndcgn.toml")
+            actual_path=$(readlink -f "$(pndcgn_discover_config_file "$source_dir")" 2>/dev/null || pndcgn_discover_config_file "$source_dir")
+            The output should eq "$expected_path"
             The status should be success
 
             rm -rf "$source_dir"
@@ -67,7 +71,10 @@ Describe "TOML Configuration File Discovery and Parsing"
             echo 'patterns = ["source-pattern"]' >> "$source_dir/pndcgn.toml"
 
             When call pndcgn_discover_config_file "$source_dir"
-            The output should eq "$source_dir/pndcgn.toml"
+            # Normalize path to handle symlinks (e.g., /var -> /private/var on macOS)
+            local expected_path
+            expected_path=$(readlink -f "$source_dir/pndcgn.toml" 2>/dev/null || echo "$source_dir/pndcgn.toml")
+            The output should eq "$expected_path"
             The status should be success
 
             rm -f "$xdg_config_dir/pndcgn.toml"
@@ -238,12 +245,17 @@ EOF
         It "handles XDG_CONFIG_HOME with spaces in path"
             local test_config_dir
             test_config_dir=$(mktemp -d -t "test config dir")
-            local config_file="$test_config_dir/pndcgn.toml"
+            # pndcgn_get_config_dir returns $XDG_CONFIG_HOME/pndcgn, so create file there
+            mkdir -p "$test_config_dir/pndcgn"
+            local config_file="$test_config_dir/pndcgn/pndcgn.toml"
             echo '[include]' > "$config_file"
             echo 'patterns = ["docs/**/*.md"]' >> "$config_file"
 
             export XDG_CONFIG_HOME="$test_config_dir"
-            When call pndcgn_discover_config_file "" 2>&1
+            # Source utilities to make function available
+            # Need to ensure HOME is set for pndcgn_get_config_dir to work
+            When run bash -c "export HOME=\"\${HOME:-/tmp}\" && source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/utilities.sh' && pndcgn_discover_config_file ''"
+            # Should return the config file path (may be normalized)
             The output should include "pndcgn.toml"
             The status should be success
 

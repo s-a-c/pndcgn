@@ -57,6 +57,12 @@ extensions = ["md", "txt", "rst", "adoc"]
 ## Validation
 
 - Patterns MUST be valid glob syntax (tested with `bash` glob expansion)
+- Supported glob patterns:
+  - `*` - Matches any characters except `/` (single level)
+  - `**` - Matches any characters including `/` (recursive)
+  - `?` - Matches a single character
+  - `[abc]` - Matches any character in the set
+  - `{a,b,c}` - Brace expansion (matches any of the patterns)
 - Extensions MUST NOT include leading dot (e.g., `md` not `.md`)
 - Unknown keys are ignored (forward compatibility)
 - Invalid patterns logged to stderr with line context

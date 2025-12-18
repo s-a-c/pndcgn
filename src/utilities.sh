@@ -31,8 +31,9 @@ if [[ -z "${UTILITIES_DIR:-}" ]]; then
 fi
 
 # Source constants (only if not already loaded)
+# shellcheck source=./constants.sh
 if [[ -z "${PNDCGN_VERSION:-}" ]]; then
-    . "$UTILITIES_DIR/constants.sh"
+    . "${UTILITIES_DIR}/constants.sh"
 fi
 
 # --- XDG Base Directory Support ---
@@ -40,37 +41,37 @@ fi
 # Handles HOME unset (NFR-TOML-053)
 pndcgn_get_state_dir() {
     local home_dir="${HOME:-}"
-    if [[ -z "$home_dir" ]]; then
+        if [[ -z "${home_dir}" ]]; then
         pndcgn_log_error "HOME environment variable is not set"
         pndcgn_log_info "Please set HOME or XDG_STATE_HOME environment variable"
         return 1
     fi
 
-    local state_dir="${XDG_STATE_HOME:-$home_dir/.local/state}/pndcgn"
-    mkdir -p "$state_dir" 2>/dev/null || {
-        pndcgn_log_error "Cannot create state directory: $state_dir"
+        local state_dir="${XDG_STATE_HOME:-${home_dir}/.local/state}/pndcgn"
+        mkdir -p "${state_dir}" 2>/dev/null || {
+                pndcgn_log_error "Cannot create state directory: ${state_dir}"
         return 1
     }
-    printf "%s" "$state_dir"
+        printf "%s" "${state_dir}"
 }
 
 # Get XDG config directory, falling back to ~/.config/pndcgn
 # Handles HOME unset (NFR-TOML-053) and XDG_CONFIG_HOME with spaces (NFR-TOML-002-003)
 pndcgn_get_config_dir() {
     local home_dir="${HOME:-}"
-    if [[ -z "$home_dir" ]]; then
+        if [[ -z "${home_dir}" ]]; then
         pndcgn_log_error "HOME environment variable is not set"
         pndcgn_log_info "Please set HOME or XDG_CONFIG_HOME environment variable"
         return 1
     fi
 
-    local config_dir="${XDG_CONFIG_HOME:-$home_dir/.config}/pndcgn"
+        local config_dir="${XDG_CONFIG_HOME:-${home_dir}/.config}/pndcgn"
     # Handle spaces in path by ensuring proper quoting in caller
-    mkdir -p "$config_dir" 2>/dev/null || {
-        pndcgn_log_error "Cannot create config directory: $config_dir"
+        mkdir -p "${config_dir}" 2>/dev/null || {
+                pndcgn_log_error "Cannot create config directory: ${config_dir}"
         return 1
     }
-    printf "%s" "$config_dir"
+        printf "%s" "${config_dir}"
 }
 
 # --- Screen Reader Detection (NFR-CLI-018) ---
@@ -92,23 +93,29 @@ pndcgn_log_structured() {
     shift
     local message="$*"
 
+    # shellcheck disable=SC2310
     if pndcgn_is_screen_reader; then
         # Structured format: [LEVEL] message
-        printf "[%s] %s\n" "$(printf "%s" "$level" | tr '[:lower:]' '[:upper:]')" "$message" >&2
+        local upper_level
+        upper_level=${level^^}
+        printf "[%s] %s\n" "${upper_level}" "${message}" >&2
     else
         # Regular formatted output
-        case "$level" in
+        case "${level}" in
             info)
-                printf "${B_GREEN}INFO:${RESET} %s\n" "$message" >&2
+                printf "${B_GREEN}INFO:${RESET} %s\n" "${message}" >&2
                 ;;
             error)
-                printf "${B_RED}ERROR:${RESET} %s\n" "$message" >&2
+                printf "${B_RED}ERROR:${RESET} %s\n" "${message}" >&2
                 ;;
             warn)
-                printf "${B_YELLOW}WARN:${RESET} %s\n" "$message" >&2
+                printf "${B_YELLOW}WARN:${RESET} %s\n" "${message}" >&2
                 ;;
             success)
-                printf "${B_SUCCESS}SUCCESS:${RESET} %s\n" "$message" >&2
+                printf "${B_SUCCESS}SUCCESS:${RESET} %s\n" "${message}" >&2
+                ;;
+            *)
+                printf "${B_RED}ERROR:${RESET} %s\n" "Unknown log level: ${level}" >&2
                 ;;
         esac
     fi
@@ -121,6 +128,7 @@ pndcgn_is_quiet() {
 }
 
 pndcgn_log_info() {
+    # shellcheck disable=SC2310
     if ! pndcgn_is_quiet; then
         pndcgn_log_structured "info" "$@"
     fi
@@ -132,6 +140,7 @@ pndcgn_log_error() {
 }
 
 pndcgn_log_warn() {
+    # shellcheck disable=SC2310
     if ! pndcgn_is_quiet; then
         pndcgn_log_structured "warn" "$@"
     fi
@@ -139,6 +148,7 @@ pndcgn_log_warn() {
 
 # Verbose logging (only if verbose mode enabled)
 pndcgn_log_verbose() {
+    # shellcheck disable=SC2310
     if [[ "${PNDCGN_VERBOSE:-false}" == "true" ]] && ! pndcgn_is_quiet; then
         printf "${DIM}DEBUG:${RESET} %s\n" "$*" >&2
     fi
@@ -149,7 +159,7 @@ pndcgn_log_verbose() {
 pndcgn_format_run_id() {
     local run_id="$1"
     # Run IDs are ULID format (26 chars), display as-is
-    printf "%s" "$run_id"
+        printf "%s" "${run_id}"
 }
 
 # --- Duration Formatting (NFR-CLI-022) ---
@@ -157,26 +167,26 @@ pndcgn_format_run_id() {
 pndcgn_format_duration() {
     local seconds="$1"
 
-    if [[ "$seconds" -lt 60 ]]; then
-        printf "%ds" "$seconds"
-    elif [[ "$seconds" -lt 3600 ]]; then
+    if [[ "${seconds}" -lt 60 ]]; then
+        printf "%ds" "${seconds}"
+    elif [[ "${seconds}" -lt 3600 ]]; then
         local minutes=$((seconds / 60))
         local remaining_seconds=$((seconds % 60))
-        if [[ $remaining_seconds -eq 0 ]]; then
-            printf "%dm" "$minutes"
+        if [[ ${remaining_seconds} -eq 0 ]]; then
+            printf "%dm" "${minutes}"
         else
-            printf "%dm %ds" "$minutes" "$remaining_seconds"
+            printf "%dm %ds" "${minutes}" "${remaining_seconds}"
         fi
     else
         local hours=$((seconds / 3600))
         local remaining_minutes=$(((seconds % 3600) / 60))
         local remaining_seconds=$((seconds % 60))
-        if [[ $remaining_minutes -eq 0 ]] && [[ $remaining_seconds -eq 0 ]]; then
-            printf "%dh" "$hours"
-        elif [[ $remaining_seconds -eq 0 ]]; then
-            printf "%dh %dm" "$hours" "$remaining_minutes"
+        if [[ ${remaining_minutes} -eq 0 ]] && [[ ${remaining_seconds} -eq 0 ]]; then
+            printf "%dh" "${hours}"
+        elif [[ ${remaining_seconds} -eq 0 ]]; then
+            printf "%dh %dm" "${hours}" "${remaining_minutes}"
         else
-            printf "%dh %dm %ds" "$hours" "$remaining_minutes" "$remaining_seconds"
+            printf "%dh %dm %ds" "${hours}" "${remaining_minutes}" "${remaining_seconds}"
         fi
     fi
 }
@@ -190,7 +200,7 @@ pndcgn_calculate_eta() {
     local elapsed="$3"
 
     # Need at least some progress to calculate ETA
-    if [[ "$current" -eq 0 ]] || [[ "$elapsed" -eq 0 ]]; then
+        if [[ "${current}" -eq 0 ]] || [[ "${elapsed}" -eq 0 ]]; then
         printf "calculating..."
         return 0
     fi
@@ -208,16 +218,16 @@ pndcgn_calculate_eta() {
     eta_seconds=$((avg_time_per_item * remaining / 1000))
 
     # Format ETA
-    if [[ "$eta_seconds" -lt 60 ]]; then
-        printf "%ds" "$eta_seconds"
-    elif [[ "$eta_seconds" -lt 3600 ]]; then
+        if [[ "${eta_seconds}" -lt 60 ]]; then
+                printf "%ds" "${eta_seconds}"
+        elif [[ "${eta_seconds}" -lt 3600 ]]; then
         local minutes=$((eta_seconds / 60))
-        printf "%dm" "$minutes"
+                    printf "%dm" "${minutes}"
     else
         local hours=$((eta_seconds / 3600))
         local minutes=$(((eta_seconds % 3600) / 60))
         if [[ $minutes -eq 0 ]]; then
-            printf "%dh" "$hours"
+                        printf "%dh" "${hours}"
         else
             printf "%dh %dm" "$hours" "$minutes"
         fi
@@ -229,17 +239,17 @@ pndcgn_calculate_eta() {
 pndcgn_format_bytes() {
     local bytes="$1"
 
-    if [[ "$bytes" -lt 1024 ]]; then
-        printf "%dB" "$bytes"
-    elif [[ "$bytes" -lt 1048576 ]]; then
+        if [[ "${bytes}" -lt 1024 ]]; then
+                printf "%dB" "${bytes}"
+        elif [[ "${bytes}" -lt 1048576 ]]; then
         local kb=$((bytes / 1024))
-        printf "%dKB" "$kb"
-    elif [[ "$bytes" -lt 1073741824 ]]; then
+                printf "%dKB" "${kb}"
+        elif [[ "${bytes}" -lt 1073741824 ]]; then
         local mb=$((bytes / 1048576))
-        printf "%dMB" "$mb"
+                printf "%dMB" "${mb}"
     else
         local gb=$((bytes / 1073741824))
-        printf "%dGB" "$gb"
+                printf "%dGB" "${gb}"
     fi
 }
 
@@ -250,32 +260,33 @@ pndcgn_confirm() {
     local default="${2:-no}"  # Default to "no" if not provided
 
     # Check if non-interactive
+        # shellcheck disable=SC2310
     if ! pndcgn_is_interactive; then
         return 1  # Non-interactive, default to no
     fi
 
     # Build prompt with default
     local full_prompt
-    if [[ "$default" == "yes" ]]; then
+        if [[ "${default}" == "yes" ]]; then
         full_prompt="${prompt} [Y/n]: "
     else
         full_prompt="${prompt} [y/N]: "
     fi
 
-    printf "%s" "$full_prompt" >&2
+        printf "%s" "${full_prompt}" >&2
     read -r response
 
     # Normalize response
-    response=$(printf "%s" "$response" | tr '[:upper:]' '[:lower:]')
+        response=$(printf "%s" "${response}" | tr '[:upper:]' '[:lower:]')
 
     # Handle empty response (use default)
-    if [[ -z "$response" ]]; then
-        [[ "$default" == "yes" ]]
+        if [[ -z "${response}" ]]; then
+                [[ "${default}" == "yes" ]]
         return $?
     fi
 
     # Check for valid responses
-    case "$response" in
+        case "${response}" in
         y|yes)
             return 0
             ;;
@@ -284,7 +295,7 @@ pndcgn_confirm() {
             ;;
         *)
             # Invalid response, use default
-            [[ "$default" == "yes" ]]
+                    [[ "${default}" == "yes" ]]
             return $?
             ;;
     esac
@@ -614,9 +625,12 @@ pndcgn_seed_ignore_file() {
         fi
     done
 
-    # Ensure .pndcgn is always ignored
+    # Ensure .pndcgn and .pndcgnignore are always ignored
     if [[ "$ignore_content" != *".pndcgn"* ]]; then
         ignore_content=".pndcgn${ignore_content:+$'\n'}$ignore_content"
+    fi
+    if [[ "$ignore_content" != *".pndcgnignore"* ]]; then
+        ignore_content=".pndcgnignore${ignore_content:+$'\n'}$ignore_content"
     fi
 
     # Write ignore file
@@ -654,23 +668,20 @@ pndcgn_path_matches_ignore() {
         [[ "$pattern" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${pattern// }" ]] && continue
 
-        # Skip binary/null bytes (malformed file detection)
-        if printf "%s" "$pattern" | grep -q $'\x00'; then
-            pndcgn_log_warn "Malformed .pndcgnignore detected (contains null bytes)"
-            continue
-        fi
-
         # Remove leading/trailing whitespace
         pattern="${pattern#"${pattern%%[![:space:]]*}"}"
         pattern="${pattern%"${pattern##*[![:space:]]}"}"
 
         # Simple glob matching (intentional glob expansion)
+        # Check full path, basename, and path ending with pattern
+                local basename_pattern="${path##*/}"
+        # Try exact basename match first (quoted), then glob patterns (unquoted)
         # shellcheck disable=SC2053
-        if [[ "$path" == $pattern ]] || [[ "$path" == */$pattern ]] || [[ "$path" == $pattern/* ]]; then
+        if [[ "$basename_pattern" == "$pattern" ]] || [[ "$path" == $pattern ]] || [[ "$path" == */$pattern ]] || [[ "$path" == $pattern/* ]] || [[ "$basename_pattern" == $pattern ]]; then
             return 0
         fi
-    done < "$ignore_file" 2>/dev/null || {
-        pndcgn_log_warn "Error reading ignore file: $ignore_file"
+    done < "$ignore_file" || {
+        # Error reading file - return 1 (no match) to allow processing to continue
         return 1
     }
 
@@ -694,7 +705,7 @@ pndcgn_discover_config_file() {
         # Follow symlinks (NFR-TOML-001)
         if [[ -L "$source_config_file" ]] || [[ -f "$source_config_file" ]]; then
             local resolved_file
-            resolved_file=$(readlink -f "$source_config_file" 2>/dev/null || readlink "$source_config_file" 2>/dev/null || printf "$source_config_file")
+                        resolved_file=$(readlink -f "$source_config_file" 2>/dev/null || readlink "$source_config_file" 2>/dev/null || printf "%s" "$source_config_file")
             if [[ -f "$resolved_file" ]]; then
                 printf "%s" "$resolved_file"
                 return 0
@@ -703,11 +714,13 @@ pndcgn_discover_config_file() {
     fi
 
     # Fall back to XDG config directory (handles spaces in path - NFR-TOML-002-003)
-    xdg_config_dir=$(pndcgn_get_config_dir)
-    xdg_config_file="$xdg_config_dir/pndcgn.toml"
-    if [[ -f "$xdg_config_file" ]]; then
-        printf "%s" "$xdg_config_file"
-        return 0
+    xdg_config_dir=$(pndcgn_get_config_dir 2>/dev/null || printf "")
+    if [[ -n "$xdg_config_dir" ]]; then
+        xdg_config_file="$xdg_config_dir/pndcgn.toml"
+        if [[ -f "$xdg_config_file" ]]; then
+            printf "%s" "$xdg_config_file"
+            return 0
+        fi
     fi
 
     # No config file found - return success with empty output

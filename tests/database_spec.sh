@@ -1,5 +1,6 @@
 #!/usr/bin/env shellspec
 #
+# shellcheck disable=SC1078,SC1079,SC2016,SC2027,SC2086,SC2140
 # pndcgn Database Tests
 #
 # Compliant with [AGENTS.md](../AGENTS.md)
@@ -17,10 +18,12 @@ Describe "Database Functions"
     Context "run creation"
         It "creates run with ULID generation"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -43,7 +46,7 @@ Describe "Database Functions"
             }
             export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_create_run "/tmp/source" "/tmp/target" "pdf" "0"
+            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0'"
             The output should match pattern "*"  # ULID format
             The status should be success
 
@@ -53,10 +56,12 @@ Describe "Database Functions"
 
         It "uses Bash fallback when ULID extension unavailable"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -79,7 +84,7 @@ Describe "Database Functions"
             }
             export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_create_run "/tmp/source" "/tmp/target" "pdf" "0"
+            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0'"
             The output should not eq ""
             The status should be success
             The stderr should include "WARN"
@@ -90,11 +95,13 @@ Describe "Database Functions"
 
         It "stores run metadata correctly"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
-            local insert_called=false
+            insert_called=false
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -130,15 +137,16 @@ Describe "Database Functions"
     Context "cache lookup"
         It "finds cached artifact with matching fingerprint"
             mkdir -p test_state test_output
-            local cached_file="$PWD/test_output/cached.pdf"
+            cached_file="$PWD/test_output/cached.pdf"
             # Create the cached file first
             echo "cached content" > "$cached_file"
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
             # Create dummy db file so existence check passes
             mkdir -p test_state
             touch test_state/pndcgn.db
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
                 # Read query from stdin (heredoc)
                 local query
@@ -156,7 +164,7 @@ Describe "Database Functions"
             }
             export -f sqlite3
 
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_check_cache "/tmp/source/file.md" "fingerprint123" "pdf"
+            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_check_cache '/tmp/source/file.md' 'fingerprint123' 'pdf'"
             The output should eq "$cached_file"
             The status should be success
 
@@ -166,10 +174,12 @@ Describe "Database Functions"
 
         It "returns failure when cache miss"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -195,10 +205,12 @@ Describe "Database Functions"
 
         It "validates cached file exists"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -225,10 +237,12 @@ Describe "Database Functions"
         It "matches by output type"
             mkdir -p test_state test_output
             echo "content" > test_output/file.pdf
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -258,11 +272,13 @@ Describe "Database Functions"
     Context "fingerprint storage"
         It "stores fingerprint for a run"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             local update_called=false
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -289,10 +305,12 @@ Describe "Database Functions"
 
         It "retrieves stored fingerprint"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -319,10 +337,12 @@ Describe "Database Functions"
 
         It "returns failure when fingerprint not found"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -348,10 +368,12 @@ Describe "Database Functions"
 
         It "verifies run exists"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -377,10 +399,12 @@ Describe "Database Functions"
 
         It "returns failure when run does not exist"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -409,11 +433,13 @@ Describe "Database Functions"
     Context "when cached outputs are missing from disk"
         It "regenerates and logs warning"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             # Mock database that returns a cached path that doesn't exist
             sqlite3() {
+                # shellcheck disable=SC2027,SC2086
                 local db_file="${1:-}"
+                # shellcheck disable=SC2027,SC2086
                 local query="${2:-}"
                 case "$db_file" in
                     *pndcgn.db)
@@ -450,7 +476,7 @@ Describe "Database Functions"
     Context "database file permissions (T076i)"
         It "sets database file permissions to 0600"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -479,7 +505,7 @@ Describe "Database Functions"
     Context "database corruption detection and recovery (T076j)"
         It "detects database corruption and attempts recovery"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
             mkdir -p test_state/pndcgn
             echo "corrupted data" > test_state/pndcgn/pndcgn.db
 
@@ -510,7 +536,7 @@ Describe "Database Functions"
     Context "run state machine transitions (T076k)"
         It "enforces valid state transitions"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -547,7 +573,7 @@ Describe "Database Functions"
     Context "running status recovery on startup (T076l)"
         It "recovers runs stuck in 'running' status on startup"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -582,7 +608,7 @@ Describe "Database Functions"
     Context "source file delete cache invalidation (T095c)"
         It "invalidates cache when source file is deleted"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -612,7 +638,7 @@ Describe "Database Functions"
     Context "output type change cache miss (T095d)"
         It "treats output type change as cache miss"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -642,7 +668,7 @@ Describe "Database Functions"
     Context "database schema versioning (T095e)"
         It "tracks database schema version"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -671,7 +697,7 @@ Describe "Database Functions"
     Context "run timestamp format (T095f)"
         It "stores run timestamps in correct format"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -705,7 +731,7 @@ Describe "Database Functions"
     Context "resume completed run error (T095g)"
         It "rejects resume of completed run"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -735,7 +761,7 @@ Describe "Database Functions"
     Context "resume with deleted source files (T095h)"
         It "handles resume when source files are deleted"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -765,7 +791,7 @@ Describe "Database Functions"
     Context "multiple pending dry-runs (T095i)"
         It "supports multiple pending dry-runs"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -795,7 +821,7 @@ Describe "Database Functions"
     Context "sqlite-ulid version check (T095j)"
         It "checks sqlite-ulid extension version"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -822,7 +848,7 @@ Describe "Database Functions"
     Context "clean non-existent run ID error (T095k)"
         It "handles clean of non-existent run ID"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in
@@ -852,7 +878,7 @@ Describe "Database Functions"
     Context "database locking timeout (T096l)"
         It "handles database locking timeout"
             mkdir -p test_state
-            export XDG_STATE_HOME="$PWD/test_state"
+            export XDG_STATE_HOME="${PWD}/test_state"
 
             sqlite3() {
                 case "${2:-}" in

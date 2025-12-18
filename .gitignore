@@ -65,5 +65,17 @@ coverage/
 # ============================================================================
 # Project-Specific Patterns
 # ============================================================================
-# Ignore files/folders with digit-only names (no extension) at any directory level
-**/[0-9]*
+
+# Ignore files/folders with PURELY numeric names (no extension) at any directory level
+# These patterns match 1-6 digit numeric-only names (e.g., "1", "42", "123456")
+# but NOT names like "002-multi-dir-select" which contain non-numeric characters
+**/[0-9]
+**/[0-9][0-9]
+**/[0-9][0-9][0-9]
+**/[0-9][0-9][0-9][0-9]
+**/[0-9][0-9][0-9][0-9][0-9]
+**/[0-9][0-9][0-9][0-9][0-9][0-9]
+
+# OS-specific junk
+.DS_Store
+Thumbs.db

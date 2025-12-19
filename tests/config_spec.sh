@@ -423,4 +423,151 @@ EOF
             rm -f "$config_file"
         End
     End
+
+    Context "max_source_dirs parsing (T011)"
+        It "returns default value when config file missing"
+            When call pndcgn_parse_toml_max_source_dirs "/nonexistent/config.toml"
+            The output should eq "4"
+            The status should be success
+        End
+
+        It "returns default value when [source] section missing"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[include]
+patterns = ["docs/**/*.md"]
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "4"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "parses valid max_source_dirs value"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = 8
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "8"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "returns default value for invalid non-integer value"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = "five"
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "4"
+            The stderr should include "Invalid max_source_dirs value"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "returns default value for value less than 1"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = 0
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "4"
+            The stderr should include "Invalid max_source_dirs value"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "caps value at 16 when exceeds maximum"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = 20
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "16"
+            The stderr should include "exceeds maximum (16), capping at 16"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "handles negative values"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = -5
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "4"
+            The stderr should include "Invalid max_source_dirs value"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "handles quoted integer values"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = "10"
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "10"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "handles edge case of maximum value (16)"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = 16
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "16"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+
+        It "handles edge case of minimum valid value (1)"
+            local config_file
+            config_file=$(mktemp)
+            cat > "$config_file" <<'EOF'
+[source]
+max_source_dirs = 1
+EOF
+
+            When call pndcgn_parse_toml_max_source_dirs "$config_file"
+            The output should eq "1"
+            The status should be success
+
+            rm -f "$config_file"
+        End
+    End
 End

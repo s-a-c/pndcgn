@@ -876,6 +876,263 @@ pndcgn_parse_toml_extensions() {
 AWK_SCRIPT
 }
 
+# Parse max_source_dirs from [source] section in pndcgn.toml
+# Returns: integer value (1-16), defaults to 4 if not configured
+# Args: config_file_path
+# Exit: 0 on success (or config missing), 1 on parse error
+# Side effects: Logs WARN to stderr if invalid value found
+pndcgn_parse_toml_max_source_dirs() {
+    local config_file="$1"
+
+    # If config file doesn't exist, return default
+    if [[ ! -f "$config_file" ]]; then
+        printf "%d" "${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        return 0
+    fi
+
+    # Extract max_source_dirs from [source] section using AWK
+    local value
+    value=$(awk -f - "$config_file" <<'AWK_SCRIPT'
+        BEGIN { in_source = 0; value = "" }
+        # Skip comments
+        /^[[:space:]]*#/ { next }
+        # Track [source] section
+        /^\[source\]/ { in_source = 1; next }
+        /^\[/ { in_source = 0; next }
+        # Extract max_source_dirs value in [source] section
+        in_source && /^[[:space:]]*max_source_dirs[[:space:]]*=[[:space:]]*/ {
+            # Extract value after =
+            sub(/^[^=]*=[[:space:]]*/, "", $0)
+            # Remove quotes if present
+            gsub(/^["'\'']|["'\'']$/, "", $0)
+            # Trim whitespace
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+            value = $0
+            # Last occurrence wins (AWK behavior)
+        }
+        END {
+            if (length(value) > 0) print value
+        }
+AWK_SCRIPT
+    )
+
+    # If not found in config, return default
+    if [[ -z "$value" ]]; then
+        printf "%d" "${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        return 0
+    fi
+
+    # Validate and normalize value
+    # Check if it's a valid integer
+    if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+        pndcgn_log_warn "Invalid max_source_dirs value in $config_file: '$value' (not an integer), using default ${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        printf "%d" "${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        return 0
+    fi
+
+    # Convert to integer for comparison
+    local int_value=$((value))
+
+    # Validate range: < 1 → use default
+    if [[ $int_value -lt 1 ]]; then
+        pndcgn_log_warn "Invalid max_source_dirs value in $config_file: $int_value (< 1), using default ${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        printf "%d" "${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        return 0
+    fi
+
+    # Validate range: > 16 → cap at 16 with warning
+    if [[ $int_value -gt "${PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS:-16}" ]]; then
+        pndcgn_log_warn "max_source_dirs=$int_value exceeds maximum (${PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS:-16}), capping at ${PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS:-16}"
+        printf "%d" "${PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS:-16}"
+        return 0
+    fi
+
+    # Valid value, return it
+    printf "%d" "$int_value"
+    return 0
+}
+
+# Compute abbreviated prefixes for directory list
+# Args: directory paths (variadic, 1 or more)
+# Returns: newline-separated list of prefixes (same order as input)
+# Algorithm: character-by-character comparison to find shortest unique prefix
+# Handles identical basenames by using parent directory name
+pndcgn_compute_abbreviated_prefixes() {
+    local -a dirs=("$@")
+
+    if [[ ${#dirs[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    local -a basenames=()
+    local -a dirnames=()  # Parent directory names for disambiguation
+    local -a prefixes=()
+
+    # Extract basenames and parent directory names
+    for dir in "${dirs[@]}"; do
+        local basename="${dir##*/}"
+        basenames+=("$basename")
+
+        # Get parent directory name (second-to-last path component)
+        local parent_dir="${dir%/*}"
+        if [[ "$parent_dir" == "$dir" ]]; then
+            # No parent (root or single component)
+            dirnames+=("")
+        else
+            dirnames+=("${parent_dir##*/}")
+        fi
+    done
+
+    # For each basename, find shortest unique prefix
+    for i in "${!basenames[@]}"; do
+        local name="${basenames[$i]}"
+        local prefix_len=1
+        local unique=false
+
+        # Try to find unique prefix by comparing characters
+        while [[ $unique == false ]] && [[ $prefix_len -le ${#name} ]]; do
+            local candidate="${name:0:$prefix_len}"
+            unique=true
+
+            for j in "${!basenames[@]}"; do
+                [[ $i -eq $j ]] && continue
+                local other="${basenames[$j]}"
+                if [[ "${other:0:$prefix_len}" == "$candidate" ]]; then
+                    unique=false
+                    ((prefix_len++))
+                    break
+                fi
+            done
+        done
+
+        local prefix="${name:0:$prefix_len}"
+
+        # If we still don't have uniqueness at full length, use parent directory
+        if [[ $unique == false ]] || [[ $prefix_len -gt ${#name} ]]; then
+            local parent="${dirnames[$i]}"
+            if [[ -n "$parent" ]]; then
+                # Use parent directory name as prefix component
+                # Sanitize parent name (replace non-alphanumeric with hyphens)
+                local sanitized_parent
+                sanitized_parent=$(printf "%s" "$parent" | sed 's/[^[:alnum:]]/-/g')
+                prefix="${sanitized_parent}-${name}"
+            else
+                # No parent, use full basename
+                prefix="$name"
+            fi
+        fi
+
+        # Sanitize prefix: replace non-alphanumeric chars with hyphens
+        prefix=$(printf "%s" "$prefix" | sed 's/[^[:alnum:]]/-/g')
+
+        prefixes+=("$prefix")
+    done
+
+    printf '%s\n' "${prefixes[@]}"
+}
+
+# Remove overlapping directories (subdirectories of other selected directories)
+# Args: directory paths (variadic, 1 or more, should be absolute paths)
+# Returns: newline-separated list of non-overlapping directories
+# Side effect: Logs INFO message to stderr for each excluded subdirectory
+# Algorithm: Check if any directory is a subdirectory (path prefix match) of another
+pndcgn_remove_overlapping_dirs() {
+    local -a dirs=("$@")
+
+    if [[ ${#dirs[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    local -a result=()
+
+    # For each directory, check if it's a subdirectory of any other
+    for i in "${!dirs[@]}"; do
+        local dir="${dirs[$i]}"
+        local is_subdir=false
+
+        # Normalize path (remove trailing slash if present)
+        dir="${dir%/}"
+
+        for j in "${!dirs[@]}"; do
+            [[ $i -eq $j ]] && continue
+            local other="${dirs[$j]}"
+            other="${other%/}"  # Normalize
+
+            # Check if dir is subdirectory of other (path prefix match)
+            # Example: /path/to/projects/frontend is subdirectory of /path/to/projects
+            if [[ "$dir" == "$other"/* ]]; then
+                pndcgn_log_info "Excluding subdirectory: $dir (contained in $other)"
+                is_subdir=true
+                break
+            fi
+        done
+
+        # If not a subdirectory, include in result
+        if [[ "$is_subdir" == "false" ]]; then
+            result+=("$dir")
+        fi
+    done
+
+    printf '%s\n' "${result[@]}"
+}
+
+# Validate source directory count against configured limit
+# Args: count (number of source directories), limit (maximum allowed)
+# Exit: 0 if valid, 2 if exceeded (with error message to stderr)
+# Side effects: Logs error message to stderr if count exceeds limit
+pndcgn_validate_source_count() {
+    local count="$1"
+    local limit="$2"
+
+    # Convert to integers for comparison
+    local int_count=$((count))
+    local int_limit=$((limit))
+
+    if [[ $int_count -gt $int_limit ]]; then
+        pndcgn_log_error "Too many source directories (max: $int_limit, got: $int_count)"
+        return 2
+    fi
+
+    return 0
+}
+
+# Convert bash array to JSON array string
+# Args: array elements (variadic)
+# Returns: JSON array string (e.g., '["/path/to/dir1", "/path/to/dir2"]')
+# Usage: json_array=$(pndcgn_array_to_json "${dirs[@]}")
+pndcgn_array_to_json() {
+    local -a items=("$@")
+
+    if [[ ${#items[@]} -eq 0 ]]; then
+        printf "[]"
+        return 0
+    fi
+
+    # Use jq if available (more reliable)
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s\n' "${items[@]}" | jq -R '.' | jq -s '.'
+        return 0
+    fi
+
+    # Fallback: manual JSON construction
+    local json="["
+    local first=true
+    for item in "${items[@]}"; do
+        if [[ "$first" == "true" ]]; then
+            first=false
+        else
+            json="${json},"
+        fi
+        # Escape quotes and backslashes, wrap in quotes
+        local escaped_item
+        escaped_item=$(printf "%s" "$item" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        json="${json}\"${escaped_item}\""
+    done
+    json="${json}]"
+
+    printf "%s" "$json"
+}
+
 # --- Run Output Directory Deletion ---
 # Delete run output directory safely
 pndcgn_delete_output_directory() {
@@ -933,6 +1190,7 @@ pndcgn_validate_output_type() {
 
 # --- fzf Integration ---
 # Interactive directory selection using fzf (if available)
+# Legacy function for backward compatibility - use pndcgn_select_source_dirs() instead
 pndcgn_select_source_dir() {
     # Check if fzf is available
     if ! command -v fzf >/dev/null 2>&1; then
@@ -952,6 +1210,166 @@ pndcgn_select_source_dir() {
     fi
 
     return 1
+}
+
+# Select multiple source directories via fzf (or fallback to numbered list)
+# Args: max_dirs (optional, defaults to PNDCGN_DEFAULT_MAX_SOURCE_DIRS)
+# Returns: newline-separated list of selected directories (absolute paths)
+# Exit: 0 on selection, 1 on cancel/error
+# Side effects: Logs WARN for duplicates, INFO for excluded subdirectories
+# Uses fzf --multi flag with limit, falls back to numbered list if fzf unavailable
+pndcgn_select_source_dirs() {
+    local max_dirs="${1:-${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}}"
+
+    # Validate max_dirs is within range
+    if [[ $max_dirs -lt 1 ]] || [[ $max_dirs -gt "${PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS:-16}" ]]; then
+        pndcgn_log_warn "max_dirs=$max_dirs out of range, using default ${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+        max_dirs="${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+    fi
+
+    local selected
+    if command -v fzf >/dev/null 2>&1; then
+        # Use fzf if available with multi-select
+        # --multi=$max_dirs limits selection count, header shows current selection
+        selected=$(find . -type d -not -path '*/\.*' 2>/dev/null | \
+            fzf --multi="$max_dirs" \
+                --height 40% \
+                --border \
+                --header="Select source directories (Tab=select, Enter=confirm, max=$max_dirs)" \
+                --preview='ls -la {}' 2>/dev/null)
+
+        # fzf returns empty on cancel (ESC) or error
+        if [[ -z "$selected" ]]; then
+            return 1
+        fi
+    else
+        # Fallback to numbered list prompt
+        pndcgn_log_info "fzf not available, using numbered list selection"
+        selected=$(pndcgn_select_source_dirs_fallback "$max_dirs")
+        if [[ -z "$selected" ]]; then
+            return 1
+        fi
+    fi
+
+    # Process selected directories: resolve to absolute paths, deduplicate, remove overlaps
+    local -a dirs=()
+    local -A seen=()
+
+    while IFS= read -r dir; do
+        [[ -z "$dir" ]] && continue
+
+        # Resolve to absolute path
+        if [[ ! -d "$dir" ]]; then
+            pndcgn_log_warn "Directory not found, skipping: $dir"
+            continue
+        fi
+
+        local abs_dir
+        abs_dir=$(cd "$dir" && pwd) || continue
+
+        # Deduplicate
+        if [[ -n "${seen[$abs_dir]:-}" ]]; then
+            pndcgn_log_warn "Duplicate directory removed: $dir"
+            continue
+        fi
+        seen[$abs_dir]=1
+        dirs+=("$abs_dir")
+    done <<< "$selected"
+
+    # Remove overlapping directories (subdirectories)
+    if [[ ${#dirs[@]} -gt 1 ]]; then
+        local non_overlapping
+        non_overlapping=$(pndcgn_remove_overlapping_dirs "${dirs[@]}")
+        mapfile -t dirs <<< "$non_overlapping"
+    fi
+
+    # Output selected directories (newline-separated)
+    if [[ ${#dirs[@]} -eq 0 ]]; then
+        return 1
+    fi
+
+    printf '%s\n' "${dirs[@]}"
+    return 0
+}
+
+# Fallback selection when fzf is unavailable
+# Args: max_dirs (maximum number of directories to select)
+# Returns: newline-separated list of selected directories (relative paths)
+# Exit: 0 on selection, 1 on cancel/error
+# Side effects: Prompts user via stdin/stdout, logs warnings for invalid input
+pndcgn_select_source_dirs_fallback() {
+    local max_dirs="$1"
+    local -a all_dirs=()
+
+    # List directories with numbers (max 50 shown)
+    local i=1
+    while IFS= read -r dir; do
+        printf "[%d] %s\n" "$i" "$dir" >&2
+        all_dirs+=("$dir")
+        ((i++))
+        if [[ $i -gt 50 ]]; then
+            break
+        fi
+    done < <(find . -type d -not -path '*/\.*' 2>/dev/null | sort)
+
+    if [[ ${#all_dirs[@]} -eq 0 ]]; then
+        pndcgn_log_warn "No directories found"
+        return 1
+    fi
+
+    printf "\nEnter directory numbers (comma-separated, max %d): " "$max_dirs" >&2
+    read -r selection || return 1
+
+    # Parse selection (e.g., "1,3,5" or "1, x, 3")
+    local -a selected=()
+    local -a invalid_entries=()
+    IFS=',' read -ra nums <<< "$selection"
+
+    for num in "${nums[@]}"; do
+        # Trim whitespace
+        num=$(printf '%s' "$num" | tr -d '[:space:]')
+
+        # Validate number
+        if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le ${#all_dirs[@]} ]]; then
+            selected+=("${all_dirs[$((num-1))]}")
+        elif [[ -n "$num" ]]; then
+            invalid_entries+=("$num")
+        fi
+    done
+
+    # Handle invalid entries
+    if [[ ${#invalid_entries[@]} -gt 0 ]]; then
+        pndcgn_log_warn "Invalid entries: ${invalid_entries[*]}"
+        printf "Press 'c' to continue with valid selections only, or 'r' to re-prompt: " >&2
+        read -r choice
+        case "$choice" in
+            r|R)
+                # Re-prompt
+                return 1  # Caller should retry
+                ;;
+            c|C|"")
+                # Continue with valid selections
+                ;;
+            *)
+                # Treat any other input as continue
+                ;;
+        esac
+    fi
+
+    # Check selection count against max
+    if [[ ${#selected[@]} -gt $max_dirs ]]; then
+        pndcgn_log_warn "Too many selections (max: $max_dirs, got: ${#selected[@]}), using first $max_dirs"
+        selected=("${selected[@]:0:$max_dirs}")
+    fi
+
+    # Empty selection cancels
+    if [[ ${#selected[@]} -eq 0 ]]; then
+        return 1
+    fi
+
+    # Output selected directories
+    printf '%s\n' "${selected[@]}"
+    return 0
 }
 
 # ============================================================================

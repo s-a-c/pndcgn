@@ -51,6 +51,17 @@ The existing `runs` table is extended to support multiple source directories.
 - All paths in `source_dirs` MUST be absolute paths
 - All paths in `source_dirs` MUST be unique (no duplicates)
 
+**JSON Format Example**:
+
+```json
+["/absolute/path/to/dir1", "/absolute/path/to/dir2", "/absolute/path/to/dir3"]
+```
+
+- Array of strings (directory paths)
+- Paths are absolute, filesystem paths
+- Strings are JSON-escaped if needed (backslashes, quotes, etc.)
+- Empty array `[]` is invalid (minimum 1 directory required)
+
 **State Transitions**:
 
 ```text

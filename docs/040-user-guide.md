@@ -43,7 +43,7 @@ Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1
 
 **Generate documentation outputs from markdown files**:
 ```bash
-# Generate PDFs for all markdown files in current directory (default)
+# Interactive: Select directories via fzf (Tab to multi-select)
 pndcgn
 
 # Generate PDFs for specific source directory
@@ -51,6 +51,9 @@ pndcgn /path/to/markdown/files
 
 # Generate with specific target directory
 pndcgn /path/to/source /path/to/target
+
+# Generate from multiple source directories (new)
+pndcgn /path/to/docs /path/to/notes -o /path/to/output
 
 # Generate with verbose output
 pndcgn --verbose /path/to/markdown/files
@@ -95,7 +98,9 @@ pndcgn --reseed source_dir
 ### 2.1. Synopsis
 
 ```bash
-pndcgn [OPTIONS] [SOURCE_DIR] [TARGET_DIR]
+pndcgn [OPTIONS] [SOURCE_DIR...] [TARGET_DIR]
+pndcgn [OPTIONS] [SOURCE_DIR...] --output TARGET_DIR
+pndcgn [OPTIONS] [SOURCE_DIR...] -- TARGET_DIR
 ```
 
 **Description**:
@@ -290,20 +295,55 @@ pndcgn --force ~/Documents/notes
 
 ### 3.2. Multiple Directories
 
-**Process multiple directories separately**:
+**Interactive multi-directory selection (NEW)**:
 ```bash
-# First directory
+# Launch interactive selector (fzf multi-select with Tab key)
+pndcgn
+
+# Select multiple directories with Tab, press Enter to confirm
+# Output: All selected directories processed in a single run
+# Files from each directory are prefixed (e.g., "docs--file.pdf", "notes--file.pdf")
+```
+
+**Command-line multi-directory (scriptable)**:
+```bash
+# Process multiple directories in one run
+pndcgn ~/notes ~/docs ~/articles -- output/
+
+# Alternative: use --output flag
+pndcgn ~/notes ~/docs ~/articles -o output/
+
+# Alternative: use -- separator
+pndcgn ~/notes ~/docs ~/articles -- output/
+```
+
+**Configure maximum selection limit**:
+```toml
+# pndcgn.toml
+[source]
+max_source_dirs = 8  # Default: 4, Maximum: 16
+```
+
+**Output organization**:
+- All files from all directories are placed in the same output directory
+- Files are prefixed with abbreviated source directory names to prevent collisions
+- Example: `docs--readme.pdf`, `notes--journal.pdf`, `articles--post.pdf`
+- Single directory (no prefix): `readme.pdf` (backward compatible)
+
+**Legacy: Process multiple directories separately**:
+```bash
+# First directory (separate run)
 pndcgn ~/notes
 # Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FGZ
 
-# Second directory (different run)
+# Second directory (separate run)
 pndcgn ~/docs
 # Run ID: 01HN7XJKQM3R8Y2VWSDP4T6FH0
 ```
 
 **Batch processing with script**:
 ```bash
-# Process multiple directories
+# Process multiple directories as separate runs
 for dir in ~/notes ~/docs ~/articles; do
     printf "Processing %s...\\n" "${dir}"
     pndcgn "${dir}"

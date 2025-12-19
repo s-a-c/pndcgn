@@ -158,7 +158,10 @@ Store source directories as JSON array in `source_dirs` column, keep `source_pat
 
 ```sql
 -- Add new column (nullable for backward compat)
-ALTER TABLE runs ADD COLUMN source_dirs TEXT;  -- JSON array
+-- Note: SQLite doesn't have a native JSON column type - JSON data is stored as TEXT.
+-- SQLite 3.38+ provides JSON functions (json_array, json_extract) that operate on TEXT
+-- columns containing valid JSON. The source_dirs column stores a JSON array string.
+ALTER TABLE runs ADD COLUMN source_dirs TEXT;  -- Stores JSON array as TEXT
 
 -- Migration: populate from existing source_path
 UPDATE runs SET source_dirs = json_array(source_path) WHERE source_dirs IS NULL;
@@ -167,7 +170,7 @@ UPDATE runs SET source_dirs = json_array(source_path) WHERE source_dirs IS NULL;
 INSERT INTO runs (run_id, source_path, source_dirs, target_path, output_type, is_dry_run)
 VALUES (?, ?, json_array(?, ?, ?), ?, ?, ?);
 -- source_path = first directory (for backward compat queries)
--- source_dirs = JSON array of all directories
+-- source_dirs = JSON array of all directories (stored as TEXT, queryable with json_extract)
 ```
 
 ---

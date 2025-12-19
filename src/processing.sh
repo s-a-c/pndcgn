@@ -427,6 +427,25 @@ pndcgn_create_output_directory() {
     printf "%s" "$output_dir"
 }
 
+# Generate prefixed output filename for multi-directory runs
+# Args: source_prefix, original_filename, output_type
+# Returns: formatted filename
+# Format: {prefix}--{original_name}.{ext} for multi-dir, {original_name}.{ext} for single dir
+pndcgn_generate_prefixed_filename() {
+    local source_prefix="$1"
+    local original_name="$2"
+    local output_type="${3:-pdf}"
+
+    # If prefix is empty, return simple filename (single directory, backward compatibility)
+    if [[ -z "$source_prefix" ]]; then
+        printf "%s.%s" "$original_name" "$output_type"
+        return 0
+    fi
+
+    # Multi-directory: use prefix--name format
+    printf "%s--%s.%s" "$source_prefix" "$original_name" "$output_type"
+}
+
 # --- Dewey Decimal Naming Scheme ---
 # Generate Dewey Decimal-style prefix for file organization
 pndcgn_dewey_prefix() {

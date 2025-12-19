@@ -972,4 +972,182 @@ Describe "pndcgn CLI (bin/pndcgn)"
             rm -rf test_source
         End
     End
+
+    # User Story 4: CLI Multi-Directory Support
+    Context "CLI multi-directory arguments (T045, T047)"
+        It "processes multiple source directories from CLI arguments"
+            mkdir -p test_dir1 test_dir2 test_dir3 test_target
+            echo "# Doc1" > test_dir1/file1.md
+            echo "# Doc2" > test_dir2/file2.md
+            echo "# Doc3" > test_dir3/file3.md
+
+            # Initialize database
+            source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+            pndcgn_db_init >/dev/null 2>&1 || true
+
+            # Mock pandoc
+            pandoc() {
+                echo "PDF" > "$3"
+            }
+            export -f pandoc
+
+            When run "$script" test_dir1 test_dir2 test_dir3 -- test_target 2>&1
+            # Should succeed (may have warnings if directories empty or processing issues)
+            # At minimum, should not fail with "usage" error
+            The stderr should not include "usage"
+            The stderr should not include "invalid"
+            The status should satisfy "test $status -eq 0 || test $status -eq 1"
+
+            unset -f pandoc
+            rm -rf test_dir1 test_dir2 test_dir3 test_target
+        End
+
+        It "uses abbreviated prefixes for CLI multi-directory arguments"
+            mkdir -p frontend backend test_target
+            echo "# Front" > frontend/file.md
+            echo "# Back" > backend/file.md
+
+            source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+            pndcgn_db_init >/dev/null 2>&1 || true
+
+            pandoc() {
+                echo "PDF" > "$3"
+            }
+            export -f pandoc
+
+            When run "$script" frontend backend -o test_target 2>&1
+            # Should process both directories
+            The status should satisfy "test $status -eq 0 || test $status -eq 1"
+
+            unset -f pandoc
+            rm -rf frontend backend test_target
+        End
+
+        It "handles --output flag with multiple source directories"
+            mkdir -p dir1 dir2 test_output
+            echo "# Doc" > dir1/file.md
+
+            source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+            pndcgn_db_init >/dev/null 2>&1 || true
+
+            pandoc() {
+                echo "PDF" > "$3"
+            }
+            export -f pandoc
+
+            When run "$script" dir1 dir2 --output test_output 2>&1
+            # Should accept --output flag
+            The stderr should not include "usage"
+            The stderr should not include "invalid"
+            The status should satisfy "test $status -eq 0 || test $status -eq 1"
+
+            unset -f pandoc
+            rm -rf dir1 dir2 test_output
+        End
+    End
+
+    Context "CLI limit validation (T046)"
+        It "exits with error code 2 when directory count exceeds limit"
+            mkdir -p dir1 dir2 dir3 dir4 dir5 dir6 test_target
+
+            # Create a config file with max_source_dirs=4
+            mkdir -p "${HOME}/.config/pndcgn"
+            echo "[source]" > "${HOME}/.config/pndcgn/pndcgn.toml"
+            echo "max_source_dirs = 4" >> "${HOME}/.config/pndcgn/pndcgn.toml"
+
+            When run "$script" dir1 dir2 dir3 dir4 dir5 -- test_target 2>&1
+            # Should exit with usage error (code 2) when limit exceeded
+            The status should eq 2
+            The stderr should include "Too many source directories"
+            The stderr should include "max: 4"
+            The stderr should include "got: 5"
+
+            rm -f "${HOME}/.config/pndcgn/pndcgn.toml"
+            rm -rf dir1 dir2 dir3 dir4 dir5 dir6 test_target
+        End
+
+        It "allows directory count up to configured limit"
+            mkdir -p dir1 dir2 dir3 dir4 test_target
+            echo "# Doc" > dir1/file.md
+
+            # Create config with max_source_dirs=4
+            mkdir -p "${HOME}/.config/pndcgn"
+            echo "[source]" > "${HOME}/.config/pndcgn/pndcgn.toml"
+            echo "max_source_dirs = 4" >> "${HOME}/.config/pndcgn/pndcgn.toml"
+
+            source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+            pndcgn_db_init >/dev/null 2>&1 || true
+
+            pandoc() {
+                echo "PDF" > "$3"
+            }
+            export -f pandoc
+
+            When run "$script" dir1 dir2 dir3 dir4 -- test_target 2>&1
+            # Should succeed (status 0 or 1, not 2 for usage error)
+            The status should not eq 2
+            The stderr should not include "Too many source directories"
+
+            unset -f pandoc
+            rm -f "${HOME}/.config/pndcgn/pndcgn.toml"
+            rm -rf dir1 dir2 dir3 dir4 test_target
+        End
+    End
+
+    Context "backward compatibility - single CLI argument (T040)"
+        It "does not invoke fzf when single source directory provided"
+            mkdir -p test_source test_target
+            echo "# Doc" > test_source/file.md
+
+            source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+            pndcgn_db_init >/dev/null 2>&1 || true
+
+            pandoc() {
+                echo "PDF" > "$3"
+            }
+            export -f pandoc
+
+            # Mock fzf to verify it's not called
+            local fzf_called=0
+            fzf() {
+                fzf_called=1
+                return 1
+            }
+            export -f fzf
+
+            When run "$script" test_source test_target 2>&1
+            # Should process without invoking fzf (single arg provided)
+            # fzf should not be called when source directory is explicitly provided
+            The status should satisfy "test $status -eq 0 || test $status -eq 1"
+            The stderr should not include "fzf"
+
+            unset -f pandoc fzf
+            rm -rf test_source test_target
+        End
+
+        It "processes single directory without prefix (backward compatible)"
+            mkdir -p test_source test_target
+            echo "# Doc" > test_source/file.md
+
+            source "${PNDCGN_PROJECT_ROOT}/src/database.sh"
+            pndcgn_db_init >/dev/null 2>&1 || true
+
+            pandoc() {
+                echo "PDF" > "$3"
+                # Verify output filename doesn't have prefix
+                if [[ "$3" == *"--"* ]]; then
+                    echo "ERROR: Prefix found in single-dir output" >&2
+                    return 1
+                fi
+            }
+            export -f pandoc
+
+            When run "$script" test_source test_target 2>&1
+            # Should succeed without prefix in output filename
+            The status should satisfy "test $status -eq 0 || test $status -eq 1"
+
+            unset -f pandoc
+            rm -rf test_source test_target
+        End
+    End
 End

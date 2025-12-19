@@ -158,11 +158,35 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_run ON generated_artifacts(run_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_source ON generated_artifacts(source_path);
 EOF
 
+    # Add source_dirs column for multi-directory support (nullable for backward compatibility)
+    # Note: SQLite doesn't have a native JSON column type - JSON data is stored as TEXT.
+    # SQLite 3.38+ provides JSON functions (json_array, json_extract) that operate on TEXT
+    # columns containing valid JSON. The source_dirs column stores a JSON array of directory paths.
+    # Check if column already exists before adding (SQLite doesn't support IF NOT EXISTS for ALTER TABLE)
+    local column_exists
+    column_exists=$(sqlite3 "$db_path" "PRAGMA table_info(runs);" | grep -c "source_dirs" || printf "0")
+
+    if [[ "$column_exists" -eq 0 ]]; then
+        # Column doesn't exist, add it
+        # Type TEXT stores JSON array string (e.g., '["/path/to/dir1", "/path/to/dir2"]')
+        sqlite3 "$db_path" "ALTER TABLE runs ADD COLUMN source_dirs TEXT;" 2>/dev/null || true
+    fi
+
+    # Migrate existing runs: populate source_dirs from source_root if NULL
+    sqlite3 "$db_path" <<'EOF'
+-- Migration: populate source_dirs from existing source_root (backward compatibility)
+UPDATE runs
+SET source_dirs = json_array(source_root)
+WHERE source_dirs IS NULL AND source_root IS NOT NULL;
+EOF
+
     # If ULID extension not available, use fallback for default
     if ! sqlite3 "$db_path" "SELECT ulid();" >/dev/null 2>&1; then
         # Remove DEFAULT (ulid()) and use application-level generation
+        # Note: This migration preserves source_dirs column if it exists
         sqlite3 "$db_path" <<'EOF'
 -- Recreate runs table without ULID default (will use application-level generation)
+-- Preserve source_dirs column if it exists
 DROP TABLE IF EXISTS runs_backup;
 CREATE TABLE runs_backup AS SELECT * FROM runs;
 DROP TABLE runs;
@@ -172,6 +196,7 @@ CREATE TABLE runs (
     completed_at INTEGER,
     status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'complete', 'failed', 'interrupted', 'partial')),
     source_root TEXT NOT NULL,
+    source_dirs TEXT,  -- JSON array of directory paths (SQLite stores JSON as TEXT, queryable with json_extract)
     target_root TEXT NOT NULL,
     output_type TEXT NOT NULL DEFAULT 'pdf',
     dry_run INTEGER NOT NULL DEFAULT 0,
@@ -179,7 +204,10 @@ CREATE TABLE runs (
     counters_json TEXT,
     UNIQUE(run_id)
 );
-INSERT INTO runs SELECT * FROM runs_backup;
+-- Migrate data, preserving source_dirs if it existed in backup
+INSERT INTO runs (run_id, created_at, completed_at, status, source_root, source_dirs, target_root, output_type, dry_run, fingerprint, counters_json)
+SELECT run_id, created_at, completed_at, status, source_root, source_dirs, target_root, output_type, dry_run, fingerprint, counters_json
+FROM runs_backup;
 DROP TABLE runs_backup;
 EOF
     fi
@@ -188,8 +216,15 @@ EOF
 }
 
 # --- Run Creation ---
+# Create run record with support for multiple source directories
+# Args: source_dirs_json (JSON array string of directory paths, e.g., '["/path/to/dir1", "/path/to/dir2"]'),
+#       target_root, output_type, dry_run
+# Modified: Now accepts source_dirs_json instead of single source_root
+# Backward compatibility: source_root is set to first element of source_dirs array
+# Note: source_dirs_json is stored in the source_dirs TEXT column (SQLite doesn't have a native JSON type,
+#       but provides JSON functions like json_array/json_extract that operate on TEXT columns)
 pndcgn_db_create_run() {
-    local source_root="$1"
+    local source_dirs_json="$1"
     local target_root="$2"
     local output_type="${3:-pdf}"
     local dry_run="${4:-0}"
@@ -199,6 +234,24 @@ pndcgn_db_create_run() {
 
     # Ensure database is initialized
     pndcgn_db_init >/dev/null
+
+    # Extract first directory from JSON array for source_root (backward compatibility)
+    local source_root
+    if command -v jq >/dev/null 2>&1; then
+        source_root=$(printf "%s" "$source_dirs_json" | jq -r '.[0] // empty' 2>/dev/null || printf "")
+    else
+        # Fallback: simple extraction of first element from JSON array ["dir1", "dir2"]
+        # Remove brackets and quotes, get first element
+        local temp
+        temp=$(printf "%s" "$source_dirs_json" | sed 's/^\[//;s/\]$//;s/"//g')
+        source_root=$(printf "%s" "$temp" | cut -d',' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    fi
+
+    # Validate source_root was extracted
+    if [[ -z "$source_root" ]]; then
+        pndcgn_log_error "Failed to extract source_root from source_dirs_json: $source_dirs_json"
+        return 1
+    fi
 
     # Generate ULID
     local run_id
@@ -213,10 +266,13 @@ pndcgn_db_create_run() {
     created_at=$(date +%s)
 
     # Insert run with timestamp using transaction (NFR-CACHE-026: transaction boundaries)
+    # Store both source_root (for backward compatibility) and source_dirs (JSON array stored as TEXT)
+    # Note: source_dirs_json is inserted as-is into the TEXT column - SQLite JSON functions
+    #       (json_array, json_extract) can be used to query/manipulate the JSON data
     sqlite3 "$db_path" <<EOF
 BEGIN TRANSACTION;
-INSERT INTO runs (run_id, source_root, target_root, output_type, dry_run, status, created_at)
-VALUES ('$run_id', '$source_root', '$target_root', '$output_type', $dry_run, 'running', $created_at);
+INSERT INTO runs (run_id, source_root, source_dirs, target_root, output_type, dry_run, status, created_at)
+VALUES ('$run_id', '$source_root', '$source_dirs_json', '$target_root', '$output_type', $dry_run, 'running', $created_at);
 COMMIT;
 EOF
 

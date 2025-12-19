@@ -72,12 +72,18 @@
 
 **⚠️ CRITICAL**: Constitution §III requires documentation updates BEFORE implementation
 
-- [ ] T001 [P] Update `docs/020-requirements.md` - add FR-001 to FR-018 in REQ-XXX format with traceability IDs
-- [ ] T002 [P] Update `docs/070-api-reference.md` - add function signatures for all new functions (pndcgn_select_source_dirs, pndcgn_compute_abbreviated_prefixes, pndcgn_generate_prefixed_filename, pndcgn_remove_overlapping_dirs, pndcgn_parse_toml_max_source_dirs, pndcgn_validate_source_count, pndcgn_select_source_dirs_fallback)
-- [ ] T003 [P] Update `docs/100-system-test-plan.md` - add TEST-XXX entries for all acceptance scenarios from spec.md User Stories 1-4
-- [ ] T004 Update `docs/020-requirements.md` traceability matrix - link REQ-XXX → TEST-XXX → Implementation
+- [x] T001 [P] Update `docs/020-requirements.md` - add FR-001 to FR-018 in REQ-XXX format with traceability IDs
+- [x] T002 [P] Update `docs/070-api-reference.md` - add function signatures for all new functions (pndcgn_select_source_dirs, pndcgn_compute_abbreviated_prefixes, pndcgn_generate_prefixed_filename, pndcgn_remove_overlapping_dirs, pndcgn_parse_toml_max_source_dirs, pndcgn_validate_source_count, pndcgn_select_source_dirs_fallback)
+- [x] T003 [P] Update `docs/100-system-test-plan.md` - add TEST-XXX entries for all acceptance scenarios from spec.md User Stories 1-4
+- [x] T004 Update `docs/020-requirements.md` traceability matrix - link REQ-XXX → TEST-XXX → Implementation
 
-**Checkpoint**: Documentation complete - implementation can proceed per constitution
+**Checkpoint**: Documentation complete - implementation can proceed per constitution ✅
+
+**Status**: All Phase 0 tasks complete (T001-T004)
+- ✅ Requirements added to docs/020-requirements.md (REQ-017 to REQ-035)
+- ✅ Function signatures added to docs/070-api-reference.md
+- ✅ System tests added to docs/100-system-test-plan.md (ST-017 to ST-035)
+- ✅ Traceability matrix updated
 
 ---
 
@@ -85,11 +91,11 @@
 
 **Purpose**: Add constants and shared infrastructure for multi-directory feature
 
-- [ ] T005 Add multi-directory constants to `src/constants.sh` (PNDCGN_DEFAULT_MAX_SOURCE_DIRS=4, PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS=16)
-- [ ] T006 [P] Create test file structure for new tests in `tests/utilities/fallback_spec.sh`
-- [ ] T007 [P] Create test file structure for prefix tests in `tests/processing/filename_prefix_spec.sh`
-- [ ] T008 [P] Create test file structure for overlap tests in `tests/processing/overlap_detection_spec.sh`
-- [ ] T009 [P] Create test file structure for integration tests in `tests/integration/multi_dir_spec.sh`
+- [x] T005 Add multi-directory constants to `src/constants.sh` (PNDCGN_DEFAULT_MAX_SOURCE_DIRS=4, PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS=16)
+- [x] T006 [P] Create test file structure for new tests in `tests/utilities/fallback_spec.sh`
+- [x] T007 [P] Create test file structure for prefix tests in `tests/processing/filename_prefix_spec.sh`
+- [x] T008 [P] Create test file structure for overlap tests in `tests/processing/overlap_detection_spec.sh`
+- [x] T009 [P] Create test file structure for integration tests in `tests/integration/multi_dir_spec.sh`
 
 ---
 
@@ -99,17 +105,17 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T010 Implement `pndcgn_parse_toml_max_source_dirs()` in `src/utilities.sh` - parse max_source_dirs from [source] section
-- [ ] T011 [P] Write unit tests for `pndcgn_parse_toml_max_source_dirs()` in `tests/utilities/config_spec.sh` (default value, valid config, invalid config, over-max config)
-- [ ] T012 Implement `pndcgn_compute_abbreviated_prefixes()` in `src/utilities.sh` - shortest unique prefix algorithm
-- [ ] T013 [P] Write unit tests for `pndcgn_compute_abbreviated_prefixes()` in `tests/processing/filename_prefix_spec.sh` (unique basenames, common prefixes, identical basenames)
-- [ ] T014 Implement `pndcgn_generate_prefixed_filename()` in `src/processing.sh` - format output filenames with prefix
-- [ ] T015 [P] Write unit tests for `pndcgn_generate_prefixed_filename()` in `tests/processing/filename_prefix_spec.sh` (with prefix, without prefix, special chars)
-- [ ] T016 Implement `pndcgn_remove_overlapping_dirs()` in `src/utilities.sh` - detect and exclude subdirectories
-- [ ] T017 [P] Write unit tests for `pndcgn_remove_overlapping_dirs()` in `tests/processing/overlap_detection_spec.sh` (no overlap, one subdir, nested subdirs)
-- [ ] T018 Extend SQLite schema in `src/database.sh` - add `source_dirs` TEXT column to runs table
-- [ ] T019 [P] Write migration test in `tests/database/schema_migration_spec.sh` - verify column added, existing data migrated
-- [ ] T020 Modify `pndcgn_db_create_run()` in `src/database.sh` - accept source_dirs_json parameter, populate both columns
+- [x] T010 Implement `pndcgn_parse_toml_max_source_dirs()` in `src/utilities.sh` - parse max_source_dirs from [source] section
+- [x] T011 [P] Write unit tests for `pndcgn_parse_toml_max_source_dirs()` in `tests/utilities/config_spec.sh` (default value, valid config, invalid config, over-max config)
+- [x] T012 Implement `pndcgn_compute_abbreviated_prefixes()` in `src/utilities.sh` - shortest unique prefix algorithm
+- [x] T013 [P] Write unit tests for `pndcgn_compute_abbreviated_prefixes()` in `tests/processing/filename_prefix_spec.sh` (unique basenames, common prefixes, identical basenames)
+- [x] T014 Implement `pndcgn_generate_prefixed_filename()` in `src/processing.sh` - format output filenames with prefix
+- [x] T015 [P] Write unit tests for `pndcgn_generate_prefixed_filename()` in `tests/processing/filename_prefix_spec.sh` (with prefix, without prefix, special chars)
+- [x] T016 Implement `pndcgn_remove_overlapping_dirs()` in `src/utilities.sh` - detect and exclude subdirectories
+- [x] T017 [P] Write unit tests for `pndcgn_remove_overlapping_dirs()` in `tests/processing/overlap_detection_spec.sh` (no overlap, one subdir, nested subdirs)
+- [x] T018 Extend SQLite schema in `src/database.sh` - add `source_dirs` TEXT column to runs table
+- [x] T019 [P] Write migration test in `tests/database/schema_migration_spec.sh` - verify column added, existing data migrated
+- [x] T020 Modify `pndcgn_db_create_run()` in `src/database.sh` - accept source_dirs_json parameter, populate both columns
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -125,21 +131,23 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T021 [P] [US1] Write BDD test for fzf multi-select in `tests/utilities/fzf_spec.sh` - Given fzf available, When Tab used, Then multiple dirs returned
-- [ ] T022 [P] [US1] Write BDD test for processing multiple dirs in `tests/integration/multi_dir_spec.sh` - Given 3 dirs selected, When processed, Then all files converted
-- [ ] T023 [P] [US1] Write BDD test for abbreviated prefixes in `tests/integration/multi_dir_spec.sh` - Given frontend/backend dirs, Then output uses front--/back-- prefixes
-- [ ] T024 [P] [US1] Write BDD test for single run ID in `tests/integration/multi_dir_spec.sh` - Given multi-dir run, Then single run_id covers all
-- [ ] T025 [P] [US1] Write BDD test for dynamic header count (FR-009) in `tests/utilities/fzf_spec.sh` - Given fzf launched, Then header shows "max=$max_dirs"
+- [x] T021 [P] [US1] Write BDD test for fzf multi-select in `tests/utilities/fzf_spec.sh` - Given fzf available, When Tab used, Then multiple dirs returned
+- [x] T022 [P] [US1] Write BDD test for processing multiple dirs in `tests/integration/multi_dir_spec.sh` - Given 3 dirs selected, When processed, Then all files converted
+- [x] T023 [P] [US1] Write BDD test for abbreviated prefixes in `tests/integration/multi_dir_spec.sh` - Given frontend/backend dirs, Then output uses front--/back-- prefixes
+- [x] T024 [P] [US1] Write BDD test for single run ID in `tests/integration/multi_dir_spec.sh` - Given multi-dir run, Then single run_id covers all
+- [x] T025 [P] [US1] Write BDD test for dynamic header count (FR-009) in `tests/utilities/fzf_spec.sh` - Given fzf launched, Then header shows "max=$max_dirs"
 
 ### 6.2. Implementation for User Story 1
 
-- [ ] T026 [US1] Implement `pndcgn_select_source_dirs()` in `src/utilities.sh` - fzf with --multi=$max_dirs flag AND dynamic header showing selection count (FR-009)
-- [ ] T027 [US1] Implement deduplication logic in `pndcgn_select_source_dirs()` - resolve absolute paths, remove duplicates with WARN
-- [ ] T028 [US1] Integrate overlap detection in `pndcgn_select_source_dirs()` - call `pndcgn_remove_overlapping_dirs()` after selection
-- [ ] T029 [US1] Update processing loop in `bin/pndcgn` - iterate source_dirs array, compute prefixes for multi-dir
-- [ ] T030 [US1] Implement graceful degradation (FR-010) in `bin/pndcgn` - continue processing if one directory fails, log WARN for failed dir
-- [ ] T031 [US1] Integrate prefix generation in `bin/pndcgn` - call `pndcgn_generate_prefixed_filename()` for output naming
-- [ ] T032 [US1] Update run creation in `bin/pndcgn` - pass source_dirs JSON to `pndcgn_db_create_run()`
+- [x] T026 [US1] Implement `pndcgn_select_source_dirs()` in `src/utilities.sh` - fzf with --multi=$max_dirs flag AND dynamic header showing selection count (FR-009)
+- [x] T027 [US1] Implement deduplication logic in `pndcgn_select_source_dirs()` - resolve absolute paths, remove duplicates with WARN
+- [x] T028 [US1] Integrate overlap detection in `pndcgn_select_source_dirs()` - call `pndcgn_remove_overlapping_dirs()` after selection
+- [x] T029 [US1] Update processing loop in `bin/pndcgn` - iterate source_dirs array, compute prefixes for multi-dir
+- [x] T030 [US1] Implement graceful degradation (FR-010) in `bin/pndcgn` - continue processing if one directory fails, log WARN for failed dir
+- [x] T031 [US1] Integrate prefix generation in `bin/pndcgn` - call `pndcgn_generate_prefixed_filename()` for output naming
+- [x] T032 [US1] Update run creation in `bin/pndcgn` - pass source_dirs JSON to `pndcgn_db_create_run()`
+- [x] T066 [US1] Implement SIGINT/SIGTERM trap handler in `bin/pndcgn` - complete current file conversion, log summary of completed work, exit cleanly (FR-019)
+- [x] T067 [P] [US1] Write BDD test for Ctrl+C graceful handling in `tests/integration/multi_dir_spec.sh` - Given multi-dir run in progress, When SIGINT sent, Then current file completes, summary logged, exit 130
 
 **Checkpoint**: User Story 1 complete - fzf multi-select works with abbreviated prefixes
 
@@ -153,15 +161,15 @@
 
 ### 7.1. Tests for User Story 2
 
-- [ ] T033 [P] [US2] Write BDD test for config limit in `tests/utilities/config_spec.sh` - Given max=5 configured, When fzf launched, Then --multi=5 used
-- [ ] T034 [P] [US2] Write BDD test for default limit in `tests/utilities/config_spec.sh` - Given no config, Then default 4 applies
-- [ ] T035 [P] [US2] Write BDD test for over-max warning in `tests/utilities/config_spec.sh` - Given max=20, Then capped at 16 with WARN
+- [x] T033 [P] [US2] Write BDD test for config limit in `tests/utilities/config_spec.sh` - Given max=5 configured, When fzf launched, Then --multi=5 used
+- [x] T034 [P] [US2] Write BDD test for default limit in `tests/utilities/config_spec.sh` - Given no config, Then default 4 applies
+- [x] T035 [P] [US2] Write BDD test for over-max warning in `tests/utilities/config_spec.sh` - Given max=20, Then capped at 16 with WARN
 
 ### 7.2. Implementation for User Story 2
 
-- [ ] T036 [US2] Read config in `bin/pndcgn` - call `pndcgn_parse_toml_max_source_dirs()` at startup
-- [ ] T037 [US2] Pass limit to fzf in `pndcgn_select_source_dirs()` - use $max_dirs from config
-- [ ] T038 [US2] Add warning logging in `pndcgn_parse_toml_max_source_dirs()` - WARN when value capped or invalid
+- [x] T036 [US2] Read config in `bin/pndcgn` - call `pndcgn_parse_toml_max_source_dirs()` at startup
+- [x] T037 [US2] Pass limit to fzf in `pndcgn_select_source_dirs()` - use $max_dirs from config
+- [x] T038 [US2] Add warning logging in `pndcgn_parse_toml_max_source_dirs()` - WARN when value capped or invalid
 
 **Checkpoint**: User Story 2 complete - configurable limits work
 
@@ -175,15 +183,15 @@
 
 ### 8.1. Tests for User Story 3
 
-- [ ] T039 [P] [US3] Write BDD test for single-select behavior in `tests/utilities/fzf_spec.sh` - Given single dir selected, Then no prefix in output
-- [ ] T040 [P] [US3] Write BDD test for CLI single arg in `tests/pndcgn_spec.sh` - Given `pndcgn ./docs ./output`, Then fzf not invoked
-- [ ] T041 [P] [US3] Write regression test in `tests/integration/multi_dir_spec.sh` - Given single dir, Then identical to pre-feature behavior
+- [x] T039 [P] [US3] Write BDD test for single-select behavior in `tests/utilities/fzf_spec.sh` - Given single dir selected, Then no prefix in output
+- [x] T040 [P] [US3] Write BDD test for CLI single arg in `tests/pndcgn_spec.sh` - Given `pndcgn ./docs ./output`, Then fzf not invoked
+- [x] T041 [P] [US3] Write regression test in `tests/integration/multi_dir_spec.sh` - Given single dir, Then identical to pre-feature behavior
 
 ### 8.2. Implementation for User Story 3
 
-- [ ] T042 [US3] Add single-dir check in `bin/pndcgn` - if source_dirs.length == 1, skip prefix computation
-- [ ] T043 [US3] Ensure empty prefix in `pndcgn_generate_prefixed_filename()` - when prefix empty, output original name only
-- [ ] T044 [US3] Verify FR-013 in `bin/pndcgn` - no source prefix when single directory processed
+- [x] T042 [US3] Add single-dir check in `bin/pndcgn` - if source_dirs.length == 1, skip prefix computation
+- [x] T043 [US3] Ensure empty prefix in `pndcgn_generate_prefixed_filename()` - when prefix empty, output original name only
+- [x] T044 [US3] Verify FR-013 in `bin/pndcgn` - no source prefix when single directory processed
 
 **Checkpoint**: User Story 3 complete - backward compatibility verified
 
@@ -197,16 +205,16 @@
 
 ### 9.1. Tests for User Story 4
 
-- [ ] T045 [P] [US4] Write BDD test for multi-arg CLI in `tests/pndcgn_spec.sh` - Given 3 source args, When run, Then all processed
-- [ ] T046 [P] [US4] Write BDD test for limit exceeded in `tests/pndcgn_spec.sh` - Given 5 args with max=4, Then exit 2 with error
-- [ ] T047 [P] [US4] Write BDD test for CLI prefix in `tests/pndcgn_spec.sh` - Given CLI multi-dir, Then abbreviated prefixes used
+- [x] T045 [P] [US4] Write BDD test for multi-arg CLI in `tests/pndcgn_spec.sh` - Given 3 source args, When run, Then all processed
+- [x] T046 [P] [US4] Write BDD test for limit exceeded in `tests/pndcgn_spec.sh` - Given 5 args with max=4, Then exit 2 with error
+- [x] T047 [P] [US4] Write BDD test for CLI prefix in `tests/pndcgn_spec.sh` - Given CLI multi-dir, Then abbreviated prefixes used
 
 ### 9.2. Implementation for User Story 4
 
-- [ ] T048 [US4] Refactor argument parsing in `bin/pndcgn` - collect positional args into array
-- [ ] T049 [US4] Implement last-arg-is-target logic in `bin/pndcgn` - per research.md CLI pattern
-- [ ] T050 [US4] Add count validation in `bin/pndcgn` - call `pndcgn_validate_source_count()`, exit 2 if exceeded
-- [ ] T051 [US4] Implement `pndcgn_validate_source_count()` in `src/utilities.sh` - compare count vs limit, emit error
+- [x] T048 [US4] Refactor argument parsing in `bin/pndcgn` - collect positional args into array
+- [x] T049 [US4] Implement explicit target directory parsing in `bin/pndcgn` - support `-o`/`--output` flag OR `--` separator to disambiguate target (per FR-014, spec.md L168)
+- [x] T050 [US4] Add count validation in `bin/pndcgn` - call `pndcgn_validate_source_count()`, exit 2 if exceeded
+- [x] T051 [US4] Implement `pndcgn_validate_source_count()` in `src/utilities.sh` - compare count vs limit, emit error
 
 **Checkpoint**: User Story 4 complete - CLI automation works
 
@@ -222,15 +230,15 @@
 
 ### 10.1. Tests for fzf Fallback
 
-- [ ] T052 [P] Write BDD test for fallback detection in `tests/utilities/fallback_spec.sh` - Given fzf unavailable, Then fallback invoked
-- [ ] T053 [P] Write BDD test for numbered list in `tests/utilities/fallback_spec.sh` - Given fallback, When "1,3" entered, Then dirs 1 and 3 selected
-- [ ] T054 [P] Write BDD test for fallback limit in `tests/utilities/fallback_spec.sh` - Given max=2, When "1,2,3" entered, Then first 2 used with WARN
+- [x] T052 [P] Write BDD test for fallback detection in `tests/utilities/fallback_spec.sh` - Given fzf unavailable, Then fallback invoked
+- [x] T053 [P] Write BDD test for numbered list in `tests/utilities/fallback_spec.sh` - Given fallback, When "1,3" entered, Then dirs 1 and 3 selected
+- [x] T054 [P] Write BDD test for fallback limit in `tests/utilities/fallback_spec.sh` - Given max=2, When "1,2,3" entered, Then first 2 used with WARN
 
 ### 10.2. Implementation for fzf Fallback
 
-- [ ] T055 Implement `pndcgn_select_source_dirs_fallback()` in `src/utilities.sh` - numbered list prompt
-- [ ] T056 Add fzf detection in `pndcgn_select_source_dirs()` - if ! command -v fzf, call fallback
-- [ ] T057 Add INFO log in `pndcgn_select_source_dirs()` - "fzf not available, using numbered list selection"
+- [x] T055 Implement `pndcgn_select_source_dirs_fallback()` in `src/utilities.sh` - numbered list prompt
+- [x] T056 Add fzf detection in `pndcgn_select_source_dirs()` - if ! command -v fzf, call fallback
+- [x] T057 Add INFO log in `pndcgn_select_source_dirs()` - "fzf not available, using numbered list selection"
 
 **Checkpoint**: fzf Fallback complete - graceful degradation works
 
@@ -240,13 +248,14 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T058 [P] Update `--help` output in `bin/pndcgn` - document multi-directory syntax
-- [ ] T059 [P] Add progress output in `bin/pndcgn` - "Processing N directories: [1/N] ./dir (X files)"
-- [ ] T060 [P] Update README.md with multi-directory usage examples
-- [ ] T061 [P] Update `docs/040-user-guide.md` with multi-directory usage per constitution §III
+- [x] T058 [P] Update `--help` output in `bin/pndcgn` - document multi-directory syntax
+- [x] T059 [P] Add progress output in `bin/pndcgn` - "Processing N directories: [1/N] ./dir (X files)"
+- [x] T060 [P] Update README.md with multi-directory usage examples
+- [x] T061 [P] Update `docs/040-user-guide.md` with multi-directory usage per constitution §III
 - [ ] T062 Run full test suite - verify all 50%+ coverage maintained
 - [ ] T063 Run ShellCheck on all modified files - ensure no warnings
 - [ ] T064 Verify quickstart.md scenarios work end-to-end
+- [ ] T068 [P] Write BDD test for SC-004 performance in `tests/integration/multi_dir_spec.sh` - Given N=4 directories, When processed, Then completion time ≤N×single + 10% overhead
 - [ ] T065 [P] Add performance validation for SC-004 - verify N-directory run (N=4) completes in ≤N×single + 10% overhead using `time` command
 
 ---

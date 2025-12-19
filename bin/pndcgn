@@ -31,14 +31,19 @@ pndcgn_usage() {
 ${BOLD}${PNDCGN_NAME}${RESET} - Documentation Generation Tool v${PNDCGN_VERSION}
 
 ${BOLD}Usage:${RESET}
-    $0 [OPTIONS] [SOURCE_DIR] [TARGET_DIR]
+    $0 [OPTIONS] [SOURCE_DIR...] [TARGET_DIR]
+    $0 [OPTIONS] [SOURCE_DIR...] --output TARGET_DIR
+    $0 [OPTIONS] [SOURCE_DIR...] -- TARGET_DIR
 
 ${BOLD}Arguments:${RESET}
-    SOURCE_DIR    Source directory (default: current directory)
-    TARGET_DIR    Target directory (default: current directory)
+    SOURCE_DIR...  One or more source directories (default: interactive selection via fzf)
+    TARGET_DIR     Target directory (default: current directory)
+                   When multiple source directories are provided, use --output/-o or -- to
+                   disambiguate the target directory
 
 ${BOLD}Options:${RESET}
     --type <TYPE>           Output type (default: ${PNDCGN_DEFAULT_OUTPUT_TYPE})
+    --output, -o <DIR>      Target directory (use this when providing multiple source dirs)
     --dry-run               Preview mode; produces no output artifacts
     --finalize <RUN_ID>     Finalize a prior dry-run if inputs/config unchanged
     --resume <RUN_ID>       Resume an interrupted run
@@ -50,8 +55,10 @@ ${BOLD}Options:${RESET}
     -h, --help              Display this help message
 
 ${BOLD}Examples:${RESET}
-    $0                          # Generate PDFs from current directory
+    $0                          # Interactive: select directories via fzf (Tab to multi-select)
     $0 docs/ output/            # Generate from docs/ to output/
+    $0 docs/ notes/ -- output/  # Generate from docs/ and notes/ to output/
+    $0 dir1 dir2 dir3 -o out/   # Generate from dir1, dir2, dir3 to out/
     $0 --dry-run                # Preview what would be generated
     $0 --finalize 01ARZ3NDEKTSV4Y5QH6J7K8M9  # Finalize a dry-run
 
@@ -516,7 +523,7 @@ EOF
 
 # --- Main Function ---
 pndcgn_main() {
-    local source_dir=""
+    local -a source_dirs=()
     local target_dir=""
     local output_type="${PNDCGN_DEFAULT_OUTPUT_TYPE}"
     local dry_run=false
@@ -529,6 +536,7 @@ pndcgn_main() {
     local yes_flag=false
     local verbose=false
     local quiet=false
+    local output_flag=false  # Track if --output/-o flag was used
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -555,6 +563,15 @@ pndcgn_main() {
                     exit "${PNDCGN_EXIT_USAGE}"
                 fi
                 output_type="$2"
+                shift 2
+                ;;
+            --output|-o)
+                if [[ $# -lt 2 ]]; then
+                    printf "%s --output requires a value\n" "${B_RED}Error:${RESET}" >&2
+                    exit "${PNDCGN_EXIT_USAGE}"
+                fi
+                target_dir="$2"
+                output_flag=true
                 shift 2
                 ;;
             --dry-run)
@@ -601,8 +618,9 @@ pndcgn_main() {
                 shift
                 ;;
             --)
+                # Separator: remaining args are target directory
+                export __pndcgn_separator_seen=1
                 shift
-                break
                 ;;
             -*)
                 printf "%s Unknown option: %s\n" "${B_RED}Error:${RESET}" "$1" >&2
@@ -610,59 +628,119 @@ pndcgn_main() {
                 exit "${PNDCGN_EXIT_USAGE}"
                 ;;
             *)
-                if [[ -z "$source_dir" ]]; then
-                    source_dir="$1"
-                elif [[ -z "$target_dir" ]]; then
-                    target_dir="$1"
+                # If --output flag was used, remaining args are target_dir only
+                if [[ "$output_flag" == "true" ]]; then
+                    if [[ -z "$target_dir" ]]; then
+                        target_dir="$1"
+                    else
+                        printf "%s Too many arguments after --output\n" "${B_RED}Error:${RESET}" >&2
+                        pndcgn_usage >&2
+                        exit "${PNDCGN_EXIT_USAGE}"
+                    fi
+                # If -- separator encountered, remaining args are target_dir only
+                elif [[ -n "${__pndcgn_separator_seen:-}" ]]; then
+                    if [[ -z "$target_dir" ]]; then
+                        target_dir="$1"
+                    else
+                        printf "%s Too many arguments after -- separator\n" "${B_RED}Error:${RESET}" >&2
+                        pndcgn_usage >&2
+                        exit "${PNDCGN_EXIT_USAGE}"
+                    fi
+                # Otherwise, collect source directories
                 else
-                    printf "%s Too many arguments\n" "${B_RED}Error:${RESET}" >&2
-                    pndcgn_usage >&2
-                    exit "${PNDCGN_EXIT_USAGE}"
+                    source_dirs+=("$1")
                 fi
                 shift
                 ;;
         esac
     done
 
-    # Set defaults - use fzf for SOURCE_DIR if not provided
+    # Set defaults - use fzf for source directories if not provided
     # Support stdin/pipe input (NFR-CLI-012: stdin input support)
-    if [[ -z "$source_dir" ]]; then
+    if [[ ${#source_dirs[@]} -eq 0 ]]; then
         # Check if stdin is available and contains data (pipe input)
         if [[ ! -t 0 ]] && [[ -n "$(head -c 1 /dev/stdin 2>/dev/null || true)" ]]; then
-            # Read source directory from stdin (first line)
-            read -r source_dir < /dev/stdin || source_dir=""
-            if [[ -z "$source_dir" ]]; then
-                source_dir="$PWD"
+            # Read source directory from stdin (first line) - backward compatibility
+            local stdin_dir
+            read -r stdin_dir < /dev/stdin || stdin_dir=""
+            if [[ -n "$stdin_dir" ]]; then
+                source_dirs+=("$stdin_dir")
+                pndcgn_log_info "Source directory from stdin: $stdin_dir"
+            else
+                source_dirs+=("$PWD")
             fi
-            pndcgn_log_info "Source directory from stdin: $source_dir"
         elif pndcgn_is_interactive; then
-            # Try fzf integration if available
-            if source_dir=$(pndcgn_select_source_dir 2>/dev/null); then
-                pndcgn_log_info "Selected source directory: $source_dir"
+            # Try fzf multi-select integration if available
+            local config_file
+            config_file=$(pndcgn_discover_config_file "$PWD" 2>/dev/null || printf "")
+            local max_dirs="${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+            if [[ -n "$config_file" ]] && [[ -f "$config_file" ]]; then
+                max_dirs=$(pndcgn_parse_toml_max_source_dirs "$config_file")
+            fi
+
+            local selected_dirs
+            if selected_dirs=$(pndcgn_select_source_dirs "$max_dirs" 2>/dev/null); then
+                # Convert newline-separated output to array
+                mapfile -t source_dirs <<< "$selected_dirs"
+                if [[ ${#source_dirs[@]} -gt 1 ]]; then
+                    pndcgn_log_info "Selected ${#source_dirs[@]} source directories: ${source_dirs[*]}"
+                else
+                    pndcgn_log_info "Selected source directory: ${source_dirs[0]}"
+                fi
             else
                 # Fallback to current directory
-                source_dir="$PWD"
+                source_dirs+=("$PWD")
             fi
         else
             # Non-interactive, no stdin: use current directory
-            source_dir="$PWD"
+            source_dirs+=("$PWD")
         fi
     fi
 
-    # Resolve paths (NFR-EDGE-004: trailing slash normalization)
-    source_dir=$(pndcgn_resolve_path "$source_dir")
+    # Resolve paths to absolute (NFR-EDGE-004: trailing slash normalization)
+    local -a resolved_source_dirs=()
+    for dir in "${source_dirs[@]}"; do
+        resolved_source_dirs+=("$(pndcgn_resolve_path "$dir")")
+    done
+    source_dirs=("${resolved_source_dirs[@]}")
     target_dir=$(pndcgn_resolve_path "${target_dir:-$PWD}")
 
-    # Basic validation
-    if [[ ! -d "$source_dir" ]]; then
-        pndcgn_log_error "Source directory does not exist: $source_dir"
+    # Validate source directories
+    local -a valid_source_dirs=()
+    for dir in "${source_dirs[@]}"; do
+        if [[ ! -d "$dir" ]]; then
+            pndcgn_log_error "Source directory does not exist: $dir"
+            continue
+        fi
+        if [[ ! -r "$dir" ]]; then
+            pndcgn_log_error "Source directory is not readable: $dir"
+            continue
+        fi
+        valid_source_dirs+=("$dir")
+    done
+
+    # Check if we have any valid directories
+    if [[ ${#valid_source_dirs[@]} -eq 0 ]]; then
+        pndcgn_log_error "No readable source directories found. Exiting."
         exit "${PNDCGN_EXIT_ERROR}"
     fi
 
-    if [[ ! -r "$source_dir" ]]; then
-        pndcgn_log_error "Source directory is not readable: $source_dir"
-        exit "${PNDCGN_EXIT_ERROR}"
+    source_dirs=("${valid_source_dirs[@]}")
+
+    # Validate source directory count against configured limit (FR-034: CLI argument limit enforcement)
+    local config_file
+    config_file=$(pndcgn_discover_config_file "$PWD" 2>/dev/null || printf "")
+    local max_dirs="${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-4}"
+    if [[ -n "$config_file" ]] && [[ -f "$config_file" ]]; then
+        max_dirs=$(pndcgn_parse_toml_max_source_dirs "$config_file")
     fi
+
+    if ! pndcgn_validate_source_count ${#source_dirs[@]} "$max_dirs"; then
+        exit "${PNDCGN_EXIT_USAGE}"  # Exit code 2 for usage error
+    fi
+
+    # For backward compatibility with single directory, use first as source_dir for existing code paths
+    local source_dir="${source_dirs[0]}"
 
     if [[ ! -d "$target_dir" ]]; then
         # Create target directory if it does not exist (T096g)
@@ -741,11 +819,14 @@ pndcgn_main() {
         export PNDCGN_QUIET=true
     fi
 
-    # Create run
+    # Create run with source_dirs JSON array
+    local source_dirs_json
+    source_dirs_json=$(pndcgn_array_to_json "${source_dirs[@]}")
+
     local run_id
     local dry_run_int=0
     [[ "$dry_run" == "true" ]] && dry_run_int=1
-    run_id=$(pndcgn_db_create_run "$source_dir" "$target_dir" "$output_type" "$dry_run_int")
+    run_id=$(pndcgn_db_create_run "$source_dirs_json" "$target_dir" "$output_type" "$dry_run_int")
 
     local formatted_run_id
     formatted_run_id=$(pndcgn_format_run_id "$run_id")
@@ -779,16 +860,71 @@ pndcgn_main() {
     local output_dir
     output_dir=$(pndcgn_create_output_directory "$target_dir" "$output_type" "$run_id")
 
-    # Discover files (system files like .pndcgnignore are already filtered in pndcgn_discover_files)
-    pndcgn_log_info "Discovering files in: $source_dir"
-    local files
-    mapfile -t files < <(pndcgn_discover_files "$source_dir" "$ignore_file")
-    local total_files=${#files[@]}
+    # Compute abbreviated prefixes if multiple directories (for output filename prefixing)
+    local -a prefixes=()
+    if [[ ${#source_dirs[@]} -gt 1 ]]; then
+        local prefixes_output
+        prefixes_output=$(pndcgn_compute_abbreviated_prefixes "${source_dirs[@]}")
+        mapfile -t prefixes <<< "$prefixes_output"
+    fi
+
+    # Process each source directory
+    local processed=0
+    local skipped=0
+    local failed=0
+    local start_time
+    start_time=$(date +%s)
+    local total_files=0
+
+    # Aggregate all files from all directories for progress tracking
+    local -a all_files=()
+    local -a all_file_source_indices=()  # Track which source_dir each file belongs to
+
+    for i in "${!source_dirs[@]}"; do
+        local current_source_dir="${source_dirs[$i]}"
+        local current_ignore_file
+
+        # Discover ignore file for this directory
+        if ! current_ignore_file=$(pndcgn_discover_ignore_file "$current_source_dir" 2>/dev/null); then
+            # Try to use source_dir's ignore file if available, otherwise create one
+            current_ignore_file="$current_source_dir/.pndcgnignore"
+        fi
+
+        # Discover files in this directory (graceful degradation: continue if one fails)
+        # Progress output: "Processing N directories: [i/N] ./dir"
+        if [[ ${#source_dirs[@]} -gt 1 ]]; then
+            pndcgn_log_info "Processing ${#source_dirs[@]} directories: [$((i + 1))/${#source_dirs[@]}] $current_source_dir"
+        else
+            pndcgn_log_info "Discovering files in: $current_source_dir"
+        fi
+
+        local dir_files
+        if dir_files=$(pndcgn_discover_files "$current_source_dir" "$current_ignore_file" 2>/dev/null); then
+            # Count files and add to aggregate array
+            local -a temp_files=()
+            mapfile -t temp_files <<< "$dir_files"
+            local dir_file_count=${#temp_files[@]}
+            for file in "${temp_files[@]}"; do
+                [[ -n "$file" ]] || continue
+                all_files+=("$file")
+                all_file_source_indices+=("$i")
+            done
+            # Progress output: show file count for each directory
+            if [[ ${#source_dirs[@]} -gt 1 ]] && [[ $dir_file_count -gt 0 ]]; then
+                pndcgn_log_info "  Found $dir_file_count files in $current_source_dir"
+            fi
+        else
+            pndcgn_log_warn "Failed to discover files in: $current_source_dir (continuing with other directories)"
+            # Continue processing other directories (graceful degradation)
+            continue
+        fi
+    done
+
+    total_files=${#all_files[@]}
 
     if [[ $total_files -eq 0 ]]; then
-        pndcgn_log_warn "Source directory is empty: no files found to process"
+        pndcgn_log_warn "No files found in any source directory"
         pndcgn_log_info "Found 0 files to process"
-        # Empty directory is not an error - just a warning
         # Exit successfully after creating run
         local db_path
         db_path=$(pndcgn_get_db_path)
@@ -803,17 +939,12 @@ WHERE run_id = '$run_id';
 EOF
         exit "${PNDCGN_EXIT_SUCCESS}"
     else
-        pndcgn_log_info "Found $total_files files to process"
+        if [[ ${#source_dirs[@]} -gt 1 ]]; then
+            pndcgn_log_info "Found $total_files files to process across ${#source_dirs[@]} directories"
+        else
+            pndcgn_log_info "Found $total_files files to process"
+        fi
     fi
-
-    # Files array is already filtered, ready for processing
-
-    # Process files
-    local processed=0
-    local skipped=0
-    local failed=0
-    local start_time
-    start_time=$(date +%s)
 
     # Start progress spinner (NFR-CLI-029-032)
     if ! pndcgn_is_quiet && pndcgn_is_interactive; then
@@ -821,7 +952,18 @@ EOF
     fi
 
     local current_count=0
-    for file in "${files[@]}"; do
+    for file_idx in "${!all_files[@]}"; do
+        # Check for interruption (FR-019: graceful cancellation)
+        if [[ "${PNDCGN_INTERRUPTED:-0}" == "1" ]]; then
+            # Current file already processed, stop here
+            pndcgn_log_info "Interruption requested, stopping after current file"
+            break
+        fi
+
+        local file="${all_files[$file_idx]}"
+        local source_idx="${all_file_source_indices[$file_idx]}"
+        local current_source_dir="${source_dirs[$source_idx]}"
+
         current_count=$((processed + skipped + failed + 1))
 
         # Calculate and display ETA for long operations (NFR-CLI-033)
@@ -858,14 +1000,26 @@ EOF
             pndcgn_log_warn "Cached output missing, regenerating: $cached_output"
         fi
 
-        # Generate output path with Dewey Decimal prefix
-        local dewey_prefix
-        dewey_prefix=$(pndcgn_dewey_prefix "$file" "$source_dir")
-        local rel_path="${file#"$source_dir"/}"
+        # Generate output filename with source prefix (if multiple directories) and Dewey Decimal prefix
+        local rel_path="${file#"$current_source_dir"/}"
         local base_name="${rel_path##*/}"
         base_name="${base_name%.md}"
         base_name="${base_name%.markdown}"
-        local output_file="$output_dir/${dewey_prefix}-${base_name}.${output_type}"
+
+        # Get source prefix if multiple directories
+        local source_prefix=""
+        if [[ ${#source_dirs[@]} -gt 1 ]] && [[ -n "${prefixes[$source_idx]:-}" ]]; then
+            source_prefix="${prefixes[$source_idx]}"
+        fi
+
+        # Generate prefixed filename (handles empty prefix for single directory case)
+        local prefixed_name
+        prefixed_name=$(pndcgn_generate_prefixed_filename "$source_prefix" "$base_name" "$output_type")
+
+        # Add Dewey Decimal prefix for organization
+        local dewey_prefix
+        dewey_prefix=$(pndcgn_dewey_prefix "$file" "$current_source_dir")
+        local output_file="$output_dir/${dewey_prefix}-${prefixed_name}"
 
         # Check for file change during processing (NFR-EDGE-024)
         local initial_fingerprint
@@ -922,9 +1076,23 @@ VALUES
 EOF
 
             pndcgn_log_info "Processed: $file -> $output_file"
+
+            # Update counters in database periodically (for interrupt summary)
+            if [[ $((current_count % 10)) -eq 0 ]] || [[ "${PNDCGN_INTERRUPTED:-0}" == "1" ]]; then
+                local counters_json="{\"total\":$total_files,\"processed\":$processed,\"skipped\":$skipped,\"failed\":$failed}"
+                sqlite3 "$db_path" "UPDATE runs SET counters_json = '$counters_json' WHERE run_id = '$run_id';" 2>/dev/null || true
+            fi
         else
             # Error already logged above (disk full or other pandoc error)
             failed=$((failed + 1))
+        fi
+
+        # Check for interruption after each file (FR-019: graceful cancellation)
+        if [[ "${PNDCGN_INTERRUPTED:-0}" == "1" ]]; then
+            # Update final counters before exit
+            local counters_json="{\"total\":$total_files,\"processed\":$processed,\"skipped\":$skipped,\"failed\":$failed}"
+            sqlite3 "$db_path" "UPDATE runs SET counters_json = '$counters_json' WHERE run_id = '$run_id';" 2>/dev/null || true
+            break
         fi
     done
 
@@ -986,12 +1154,65 @@ EOF
 }
 
 # --- Trap Handlers ---
-# Cleanup on interruption (NFR-EDGE-044: SIGHUP is ignored, only INT/TERM are trapped)
+# Graceful shutdown handler for SIGINT/SIGTERM (FR-019: graceful cancellation)
+# Completes current file conversion, logs summary, then exits
+pndcgn_handle_interrupt() {
+    # Set flag to stop processing after current file
+    export PNDCGN_INTERRUPTED=1
+    # Don't exit immediately - let current file finish
+    # The processing loop will check this flag and exit after current file
+}
+
+# Cleanup on exit (NFR-EDGE-044: SIGHUP is ignored, only INT/TERM are trapped)
 # Note: SIGHUP is intentionally NOT trapped to allow process to continue in background
 pndcgn_cleanup_on_exit() {
     local exit_code=$?
-    if [[ -n "${run_id:-}" ]] && [[ "$exit_code" -ne 0 ]]; then
-        # Mark run as interrupted if it exists (NFR-CLI-049)
+
+    # Handle interrupted runs with summary (FR-019: graceful cancellation)
+    if [[ "${PNDCGN_INTERRUPTED:-0}" == "1" ]] && [[ -n "${run_id:-}" ]]; then
+        # Complete current file (handled in processing loop via PNDCGN_INTERRUPTED flag)
+        # Log summary of completed work
+        if pndcgn_db_run_exists "${run_id:-}" 2>/dev/null; then
+            local db_path
+            db_path=$(pndcgn_get_db_path)
+
+            # Get current counters from database
+            local counters_json
+            counters_json=$(sqlite3 "$db_path" "SELECT counters_json FROM runs WHERE run_id = '${run_id}'" 2>/dev/null || printf "{}")
+
+            local processed=0
+            local total=0
+            if [[ -n "$counters_json" ]] && [[ "$counters_json" != "{}" ]]; then
+                if command -v jq >/dev/null 2>&1; then
+                    processed=$(printf "%s" "$counters_json" | jq -r '.processed // 0' 2>/dev/null || printf "0")
+                    total=$(printf "%s" "$counters_json" | jq -r '.total // 0' 2>/dev/null || printf "0")
+                else
+                    # Fallback: extract from JSON string
+                    local processed_match
+                    processed_match=$(printf "%s" "$counters_json" | grep -o '"processed":[0-9]*' | grep -o '[0-9]*' || true)
+                    [[ -n "$processed_match" ]] && processed="$processed_match"
+                    local total_match
+                    total_match=$(printf "%s" "$counters_json" | grep -o '"total":[0-9]*' | grep -o '[0-9]*' || true)
+                    [[ -n "$total_match" ]] && total="$total_match"
+                fi
+            fi
+
+            # Update run status to interrupted
+            pndcgn_db_update_run_status "${run_id:-}" "interrupted" 2>/dev/null || true
+
+            local formatted_run_id
+            formatted_run_id=$(pndcgn_format_run_id "${run_id:-}")
+            printf "\n${B_YELLOW}⚠${RESET} Run interrupted: ${BOLD}%s${RESET}\n" "$formatted_run_id" >&2
+            if [[ $total -gt 0 ]]; then
+                printf "  Completed %d/%d files. Exiting.\n" "$processed" "$total" >&2
+            else
+                printf "  Completed %d files. Exiting.\n" "$processed" >&2
+            fi
+            printf "  To resume, use: ${BOLD}%s --resume %s${RESET}\n" "$0" "$formatted_run_id" >&2
+        fi
+        exit 130  # Standard exit code for SIGINT
+    elif [[ -n "${run_id:-}" ]] && [[ "$exit_code" -ne 0 ]]; then
+        # Mark run as interrupted if it exists (NFR-CLI-049) - non-interrupt exit
         if pndcgn_db_run_exists "${run_id:-}" 2>/dev/null; then
             pndcgn_db_update_run_status "${run_id:-}" "interrupted" 2>/dev/null || true
             local formatted_run_id
@@ -1003,8 +1224,8 @@ pndcgn_cleanup_on_exit() {
     exit $exit_code
 }
 
+trap 'pndcgn_handle_interrupt' INT TERM
 trap 'pndcgn_cleanup_on_exit' EXIT
-trap 'pndcgn_cleanup_on_exit' INT TERM
 
 # --- Invoke Main ---
 pndcgn_main "$@"

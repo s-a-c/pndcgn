@@ -94,3 +94,11 @@ fi
 if [[ -z "${PNDCGN_EXIT_USAGE:-}" ]]; then
     PNDCGN_EXIT_USAGE=2
 fi
+
+# --- Multi-Directory Selection Constants ---
+if [[ -z "${PNDCGN_DEFAULT_MAX_SOURCE_DIRS:-}" ]]; then
+    PNDCGN_DEFAULT_MAX_SOURCE_DIRS=4
+fi
+if [[ -z "${PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS:-}" ]]; then
+    PNDCGN_ABSOLUTE_MAX_SOURCE_DIRS=16
+fi

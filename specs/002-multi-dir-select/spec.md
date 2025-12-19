@@ -34,14 +34,14 @@
 
 ### 1.1. Session 2025-12-18
 
-- Q: How should output files be organized when processing multiple source directories? → A: Flat structure with abbreviated source prefix in filename (e.g., `proj--file.pdf`, `docs--file.pdf`). Prefix is abbreviated to shortest unique form within the run to prevent overlong filenames.
+- Q: How should output files be organized when processing multiple source directories? → A: Flat structure with abbreviated source prefix in filename (e.g., `proj--file.pdf`, `docs--file.pdf`). Prefix is abbreviated to shortest unique form within the run to prevent overlong filenames. Algorithm: character-by-character comparison of directory basenames from start until unique (see research.md §2 for full algorithm).
 - Q: Should users be able to pass multiple source directories directly via command line arguments? → A: Yes, support multiple paths as positional args (e.g., `pndcgn dir1 dir2 dir3 target/`)
 - Q: What should happen when fzf is not installed or fails to launch? → A: Fallback to simple numbered list prompt (select by entering numbers)
 - Q: What logging/observability approach should multi-directory operations use? → A: Follow existing pndcgn logging conventions (INFO/WARN/ERROR to stderr)
 - Q: How should overlapping directories (subdirectory of another selected directory) be handled? → A: Detect overlap, exclude subdirectory automatically with INFO message
 - Q: What happens when ALL selected directories are unreadable or fail? → A: Exit with error code 1 and clear error message
 - Q: How should symbolic links (symlinks) be handled for directory selection? → A: Resolve symlinks to real paths before deduplication and overlap detection
-- Q: How should invalid input in the fallback numbered list prompt be handled? → A: Show invalid entries and offer user choice: continue with valid selections only, or re-prompt to correct
+- Q: How should invalid input in the fallback numbered list prompt be handled? → A: Show invalid entries and offer user choice: press 'c' to continue with valid selections only, or 'r' to re-prompt and correct selection
 - Q: How should long-running multi-directory operations handle cancellation? → A: Support Ctrl+C with graceful cleanup (complete current file, then stop)
 - Q: How should CLI multi-source disambiguate target directory? → A: Support both `--output`/`-o` flag AND `--` separator (e.g., `pndcgn src1 src2 -o target` or `pndcgn src1 src2 -- target`)
 
@@ -74,7 +74,7 @@ As a power user, I want to configure the maximum number of directories I can sel
 
 **Acceptance Scenarios**:
 
-1. **Given** user has configured `max_source_dirs = 5` in pndcgn.toml, **When** user attempts to select 6 directories in fzf, **Then** the 6th selection is prevented or a warning is shown
+1. **Given** user has configured `max_source_dirs = 5` in pndcgn.toml, **When** user attempts to select 6 directories in fzf, **Then** fzf prevents the 6th selection (fzf `--multi=5` flag enforces limit at selection time)
 2. **Given** no configuration is set, **When** user selects directories, **Then** the default limit of 4 directories applies
 3. **Given** user sets `max_source_dirs = 20` (above maximum), **When** pndcgn runs, **Then** the limit is capped at 16 with a warning message
 
@@ -90,7 +90,7 @@ As an existing user, I want the current single-directory selection behavior to c
 
 **Acceptance Scenarios**:
 
-1. **Given** user launches fzf selection, **When** user selects a single directory and presses Enter (without using Tab), **Then** behavior is identical to current single-select mode (no source prefix added to filenames)
+1. **Given** user launches fzf selection, **When** user selects a single directory and presses Enter (without using Tab), **Then** behavior is identical to current single-select mode (no abbreviated source prefix added to filenames)
 2. **Given** user provides source directory as command-line argument, **When** pndcgn runs, **Then** fzf is not invoked and single directory is processed (existing behavior)
 
 ---
@@ -129,6 +129,8 @@ When fzf is not installed or fails to launch, the system provides a fallback mec
   - System falls back to current directory with a warning, matching current behavior
 - What happens when one of the selected directories is unreadable?
   - System logs a warning for that directory and continues processing the remaining directories
+- What happens when a directory becomes unreadable during processing (mid-processing state change)?
+  - System logs a warning for that directory and continues processing the remaining directories (same as initial unreadable state - graceful degradation applies throughout processing)
 - What happens when ALL selected directories are unreadable or fail?
   - System exits with error code 1 and a clear error message indicating no directories could be processed
 - What happens when selected directories overlap (one is a subdirectory of another)?
@@ -143,8 +145,6 @@ When fzf is not installed or fails to launch, the system provides a fallback mec
   - Output files are distinguished by their abbreviated source directory prefix (e.g., `proj--file.pdf`, `docs--file.pdf`)
 - What happens when directory names share common prefixes (e.g., `project-a`, `project-b`)?
   - System computes shortest unique abbreviation for each (e.g., `a--file.pdf`, `b--file.pdf` or `proj-a--file.pdf`, `proj-b--file.pdf`)
-- What happens when fzf is not installed or fails to launch?
-  - See [Derived Feature - fzf Fallback](#25-derived-feature---fzf-fallback-from-fr-016) above
 
 ---
 
@@ -159,17 +159,17 @@ When fzf is not installed or fails to launch, the system provides a fallback mec
 - **FR-005**: System MUST support configuration via `max_source_dirs` setting in pndcgn.toml under `[source]` section
 - **FR-006**: System MUST maintain backward compatibility with single-directory selection (no Tab usage, no prefix)
 - **FR-007**: System MUST deduplicate selected directories before processing
-- **FR-008**: System MUST warn users when configured limit exceeds the absolute maximum (16)
+- **FR-008**: System MUST warn users when configured limit exceeds the absolute maximum (16). Warning format: `"max_source_dirs=$value exceeds maximum (16), capping at 16"` (logged as WARN to stderr)
 - **FR-009**: System MUST display the number of selected directories in the fzf header/prompt
 - **FR-010**: System MUST continue processing remaining directories if one directory fails (graceful degradation)
 - **FR-011**: System MUST prefix output filenames with abbreviated source directory name when multiple directories are selected
 - **FR-012**: System MUST compute the shortest unique prefix for each source directory within a run to prevent overlong filenames
-- **FR-013**: System MUST NOT add source prefix to filenames when only a single directory is processed (backward compatibility)
+- **FR-013**: System MUST NOT add abbreviated source prefix to filenames when only a single directory is processed (backward compatibility)
 - **FR-014**: System MUST accept multiple source directories as positional CLI arguments with explicit target specification via `--output`/`-o` flag OR `--` separator (e.g., `pndcgn src1 src2 -o target/` or `pndcgn src1 src2 -- target/`)
 - **FR-015**: System MUST reject CLI invocations that exceed the configured directory limit with a clear error message
 - **FR-016**: System MUST fallback to a numbered list prompt when fzf is unavailable, allowing users to select directories by entering numbers
 - **FR-017**: System MUST use existing pndcgn logging conventions (INFO/WARN/ERROR to stderr) for all multi-directory operations
-- **FR-018**: System MUST detect overlapping directories (where one is a subdirectory of another) and automatically exclude the subdirectory with an INFO message
+- **FR-018**: System MUST detect overlapping directories (where one is a subdirectory of another) and automatically exclude the subdirectory with an INFO message. Message format: `"Excluding subdirectory: $subdir (contained in $parent_dir)"` (logged as INFO to stderr)
 - **FR-019**: System MUST handle Ctrl+C gracefully during multi-directory processing by completing the current file conversion, then stopping with a summary of completed work
 
 ---
@@ -206,5 +206,6 @@ When fzf is not installed or fails to launch, the system provides a fallback mec
 - Each selected directory is processed independently (no cross-directory file merging)
 - Source directory names are filesystem-safe and can be used in output filenames (special characters will be sanitized)
 - For CLI multi-source, target directory must be explicitly specified via `--output`/`-o` flag or `--` separator to avoid ambiguity
+- Memory and resource usage scales linearly with number of directories (processing 16 directories requires ~16× single-directory memory, within reasonable limits for typical document sizes)
 
 ---

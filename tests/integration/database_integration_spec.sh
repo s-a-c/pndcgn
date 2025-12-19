@@ -37,10 +37,10 @@ Describe "Database Integration Tests (No Mocks)"
             export XDG_STATE_HOME="$PWD/test_state"
 
             # Initialize database first (suppress ULID extension warning)
-            bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_init" >/dev/null 2>&1 || true
+            bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/utilities.sh' && pndcgn_db_init" >/dev/null 2>&1 || true
 
-            # Create run and verify in single test
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && run_id=\$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0') && pndcgn_db_run_exists \"\$run_id\" && echo \"\$run_id\""
+            # Create run with JSON array format (new signature)
+            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/utilities.sh' && source_dirs_json=\$(pndcgn_array_to_json '/tmp/source') && run_id=\$(pndcgn_db_create_run \"\$source_dirs_json\" '/tmp/target' 'pdf' '0') && pndcgn_db_run_exists \"\$run_id\" && echo \"\$run_id\""
             The output should not eq ""
             The status should be success
 
@@ -53,10 +53,10 @@ Describe "Database Integration Tests (No Mocks)"
             export XDG_STATE_HOME="$PWD/test_state"
 
             # Initialize database (suppress ULID extension warning)
-            bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && pndcgn_db_init" >/dev/null 2>&1 || true
+            bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/utilities.sh' && pndcgn_db_init" >/dev/null 2>&1 || true
 
-            # Create a run and store/retrieve fingerprint in single test
-            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && run_id=\$(pndcgn_db_create_run '/tmp/source' '/tmp/target' 'pdf' '0') && pndcgn_db_store_fingerprint \"\$run_id\" 'test-fingerprint-123' && pndcgn_db_get_fingerprint \"\$run_id\""
+            # Create a run with JSON array format and store/retrieve fingerprint in single test
+            When run bash -c "source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/database.sh' && source '${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/utilities.sh' && source_dirs_json=\$(pndcgn_array_to_json '/tmp/source') && run_id=\$(pndcgn_db_create_run \"\$source_dirs_json\" '/tmp/target' 'pdf' '0') && pndcgn_db_store_fingerprint \"\$run_id\" 'test-fingerprint-123' && pndcgn_db_get_fingerprint \"\$run_id\""
             The output should eq "test-fingerprint-123"
             The status should be success
 

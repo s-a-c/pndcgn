@@ -436,14 +436,21 @@ pndcgn_generate_prefixed_filename() {
     local original_name="$2"
     local output_type="${3:-pdf}"
 
+    # Strip original extension from filename
+    local base_name="${original_name%.*}"  # Remove last extension
+    # Handle edge case: filename with no extension (e.g., "README")
+    if [[ "$base_name" == "$original_name" ]]; then
+        base_name="$original_name"
+    fi
+
     # If prefix is empty, return simple filename (single directory, backward compatibility)
     if [[ -z "$source_prefix" ]]; then
-        printf "%s.%s" "$original_name" "$output_type"
+        printf "%s.%s" "$base_name" "$output_type"
         return 0
     fi
 
     # Multi-directory: use prefix--name format
-    printf "%s--%s.%s" "$source_prefix" "$original_name" "$output_type"
+    printf "%s--%s.%s" "$source_prefix" "$base_name" "$output_type"
 }
 
 # --- Dewey Decimal Naming Scheme ---

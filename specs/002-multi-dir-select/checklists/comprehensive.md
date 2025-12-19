@@ -16,8 +16,8 @@
 - [x] CHK003 - Are valid value types (integer) and ranges (1-16) documented for `max_source_dirs`? [Completeness, Gap] ✓ Data-model §1.2 shows Type: integer, Range: 1-16
 - [x] CHK004 - Is the default value (4) explicitly documented when config is missing? [Completeness, Spec §FR-003] ✓ FR-003 states "defaulting to 4 directories"
 - [x] CHK005 - Is the absolute maximum (16) documented as a hard cap? [Completeness, Spec §FR-004] ✓ FR-004 states "absolute maximum of 16 directories"
-- [ ] CHK006 - Are requirements for config file location (pndcgn.toml path) specified? [Gap] - Inherited from base pndcgn but not explicitly stated in this feature spec
-- [ ] CHK007 - Is config file discovery order (CWD, XDG_CONFIG_HOME, etc.) documented? [Gap] - Inherited from base pndcgn but not explicitly stated in this feature spec
+- [x] CHK006 - Are requirements for config file location (pndcgn.toml path) specified? [Gap] ✓ Spec §5 Assumptions now documents config file location: CWD, XDG_CONFIG_HOME, source directory (in order)
+- [x] CHK007 - Is config file discovery order (CWD, XDG_CONFIG_HOME, etc.) documented? [Gap] ✓ Spec §5 Assumptions now documents discovery order: 1) CWD, 2) XDG config, 3) Source directory
 
 ### 1.2. Configuration Clarity
 
@@ -25,7 +25,7 @@
 - [x] CHK009 - Is the behavior when `max_source_dirs` is negative explicitly defined? [Clarity, Spec §2.6 Edge Cases] ✓ Spec §2.6 covers negative values (same as 0 - invalid)
 - [x] CHK010 - Is the behavior when `max_source_dirs` is non-integer (e.g., "five") defined? [Gap] ✓ Data-model §1.2 Validation Rules states "Non-integer values treated as invalid → use default (4)"
 - [x] CHK011 - Is the behavior when `[source]` section is missing entirely defined? [Gap] ✓ Implementation uses default (4) when section missing - matches FR-003 default behavior
-- [ ] CHK012 - Is the behavior when config file is malformed (syntax error) defined? [Gap] - Inherited from base pndcgn but not explicitly stated
+- [x] CHK012 - Is the behavior when config file is malformed (syntax error) defined? [Gap] ✓ Spec §2.6 Edge Cases now defines: uses default max_source_dirs=4 with WARN message "Config file parse error: $error, using default max_source_dirs=4"
 - [x] CHK013 - Is the warning message format for over-max config specified? [Clarity, Spec §FR-008] ✓ Spec §FR-008 now specifies format: "max_source_dirs=$value exceeds maximum (16), capping at 16"
 
 ### 1.3. Configuration Consistency
@@ -50,7 +50,7 @@
 - [x] CHK021 - Is "unreadable directory" defined (permission denied vs. not exists)? [Clarity, Spec §2.6] ✓ Implementation checks `[[ ! -r "$dir" ]]` which covers both permission denied and non-existent (test -r returns false for both) - graceful degradation applies to both cases
 - [x] CHK022 - Is the behavior when ALL selected directories are unreadable specified? [Gap] ✓ Spec §1 clarifications states "Exit with error code 1 and clear error message"
 - [x] CHK023 - Is the behavior when a directory becomes unreadable mid-processing specified? [Gap] ✓ Spec §2.6 now addresses: "System logs a warning for that directory and continues processing the remaining directories (same as initial unreadable state - graceful degradation applies throughout processing)"
-- [ ] CHK024 - Is the behavior when a directory is deleted during selection specified? [Gap] - Not addressed
+- [x] CHK024 - Is the behavior when a directory is deleted during selection specified? [Gap] ✓ Spec §2.6 Edge Cases now addresses: deleted directories treated as unreadable (graceful degradation: log WARN, continue with remaining directories)
 - [x] CHK025 - Is the behavior for symlinked directories specified? [Gap] ✓ Spec §1 clarifications states "Resolve symlinks to real paths before dedup/overlap detection"
 - [x] CHK026 - Is the behavior for directories with special characters in names specified? [Assumption, Spec §5] ✓ Spec §5 states "special characters will be sanitized", data-model §1.4 specifies sanitization rules
 

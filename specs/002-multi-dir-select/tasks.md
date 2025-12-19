@@ -80,6 +80,7 @@
 **Checkpoint**: Documentation complete - implementation can proceed per constitution ✅
 
 **Status**: All Phase 0 tasks complete (T001-T004)
+
 - ✅ Requirements added to docs/020-requirements.md (REQ-017 to REQ-035)
 - ✅ Function signatures added to docs/070-api-reference.md
 - ✅ System tests added to docs/100-system-test-plan.md (ST-017 to ST-035)
@@ -252,11 +253,11 @@
 - [x] T059 [P] Add progress output in `bin/pndcgn` - "Processing N directories: [1/N] ./dir (X files)"
 - [x] T060 [P] Update README.md with multi-directory usage examples
 - [x] T061 [P] Update `docs/040-user-guide.md` with multi-directory usage per constitution §III
-- [ ] T062 Run full test suite - verify all 50%+ coverage maintained
-- [ ] T063 Run ShellCheck on all modified files - ensure no warnings
-- [ ] T064 Verify quickstart.md scenarios work end-to-end
-- [ ] T068 [P] Write BDD test for SC-004 performance in `tests/integration/multi_dir_spec.sh` - Given N=4 directories, When processed, Then completion time ≤N×single + 10% overhead
-- [ ] T065 [P] Add performance validation for SC-004 - verify N-directory run (N=4) completes in ≤N×single + 10% overhead using `time` command
+- [x] T062 Run full test suite - verify all 50%+ coverage maintained
+- [x] T063 Run ShellCheck on all modified files - ensure no warnings
+- [x] T064 Verify quickstart.md scenarios work end-to-end
+- [x] T068 [P] Write BDD test for SC-004 performance in `tests/integration/multi_dir_spec.sh` - Given N=4 directories, When processed, Then completion time ≤N×single + 10% overhead
+- [x] T065 [P] Add performance validation for SC-004 - verify N-directory run (N=4) completes in ≤N×single + 10% overhead using `time` command
 
 ---
 
@@ -363,6 +364,7 @@ Task: "T025 Write BDD test for dynamic header count (FR-009)"
 ### 16.3. Suggested MVP Scope
 
 **Just User Story 1** - This delivers:
+
 - fzf multi-select with Tab key
 - Abbreviated unique prefixes
 - Single run ID for all directories

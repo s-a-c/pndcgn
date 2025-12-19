@@ -69,14 +69,54 @@ check_prerequisites() {
     return 0
 }
 
-# Ensure results directories exist
+# Ensure results directories exist (including date-stamped subdirectories)
 ensure_results_dirs() {
+    local date_folder
+    date_folder=$(get_date_folder)
+
+    # Create base directories
     mkdir -p "${RESULTS_DIR}" "${COVERAGE_DIR}" "${REPORTS_DIR}" "${LOGS_DIR}"
+
+    # Create date-stamped subdirectories
+    mkdir -p "$(get_reports_dir "${date_folder}")"
+    mkdir -p "$(get_logs_dir "${date_folder}")"
+    mkdir -p "$(get_coverage_dir "${date_folder}")"
 }
 
-# Generate timestamp
+# Generate timestamp (YYYYMMDD-HHMMSS)
 get_timestamp() {
     date +%Y%m%d-%H%M%S
+}
+
+# Get date folder (YYYY-MM-DD) from timestamp or current date
+get_date_folder() {
+    local timestamp="${1:-}"
+    if [[ -n "${timestamp}" ]] && [[ "${timestamp}" =~ ^([0-9]{4})([0-9]{2})([0-9]{2}) ]]; then
+        # Extract date from timestamp (YYYYMMDD-HHMMSS)
+        local year="${BASH_REMATCH[1]}"
+        local month="${BASH_REMATCH[2]}"
+        local day="${BASH_REMATCH[3]}"
+        printf "%s-%s-%s" "${year}" "${month}" "${day}"
+    else
+        # Use current date
+        date +%Y-%m-%d
+    fi
+}
+
+# Get date-stamped results directories
+get_reports_dir() {
+    local date_folder="${1:-$(get_date_folder)}"
+    printf "%s/%s" "${REPORTS_DIR}" "${date_folder}"
+}
+
+get_logs_dir() {
+    local date_folder="${1:-$(get_date_folder)}"
+    printf "%s/%s" "${LOGS_DIR}" "${date_folder}"
+}
+
+get_coverage_dir() {
+    local date_folder="${1:-$(get_date_folder)}"
+    printf "%s/%s" "${COVERAGE_DIR}" "${date_folder}"
 }
 
 # Clean old results (optional)
@@ -141,8 +181,16 @@ run_shellspec_with_coverage() {
     shift
     local extra_args=("$@")
 
+    # Get date-stamped coverage directory
+    local date_folder
+    date_folder=$(get_date_folder)
+    local coverage_date_dir
+    coverage_date_dir=$(get_coverage_dir "${date_folder}")
+    mkdir -p "${coverage_date_dir}"
+
     local args=(
         "--kcov"
+        "--kcov-dir" "${coverage_date_dir}"
         "--shell" "bash"
         "--color"
         "--format" "documentation"
@@ -171,6 +219,9 @@ print_summary() {
     local test_type="$2"
     local timestamp="$3"
 
+    local date_folder
+    date_folder=$(get_date_folder "${timestamp}")
+
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     if [[ ${exit_code} -eq 0 ]]; then
@@ -180,10 +231,13 @@ print_summary() {
     fi
     echo ""
     print_info "Results: ${RESULTS_DIR}"
-    print_info "Logs: ${LOGS_DIR}"
-    print_info "Reports: ${REPORTS_DIR}"
-    if [[ -d "${COVERAGE_DIR}" ]] && [[ -n "$(ls -A "${COVERAGE_DIR}" 2>/dev/null)" ]]; then
-        print_info "Coverage: ${COVERAGE_DIR}/index.html"
+    print_info "Date folder: ${date_folder}"
+    print_info "Logs: $(get_logs_dir "${date_folder}")"
+    print_info "Reports: $(get_reports_dir "${date_folder}")"
+    local coverage_date_dir
+    coverage_date_dir=$(get_coverage_dir "${date_folder}")
+    if [[ -d "${coverage_date_dir}" ]] && [[ -n "$(ls -A "${coverage_date_dir}" 2>/dev/null)" ]]; then
+        print_info "Coverage: ${coverage_date_dir}/index.html"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 

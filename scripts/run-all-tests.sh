@@ -98,11 +98,16 @@ main() {
     fi
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
+    local date_folder
+    date_folder=$(get_date_folder "${timestamp}")
     print_info "Results: ${RESULTS_DIR}"
-    print_info "Logs: ${LOGS_DIR}"
-    print_info "Reports: ${REPORTS_DIR}"
-    if [[ "${use_coverage}" == "true" ]] && [[ -d "${COVERAGE_DIR}" ]] && [[ -n "$(ls -A "${COVERAGE_DIR}" 2>/dev/null)" ]]; then
-        print_info "Coverage: ${COVERAGE_DIR}/index.html"
+    print_info "Date folder: ${date_folder}"
+    print_info "Logs: $(get_logs_dir "${date_folder}")"
+    print_info "Reports: $(get_reports_dir "${date_folder}")"
+    local coverage_date_dir
+    coverage_date_dir=$(get_coverage_dir "${date_folder}")
+    if [[ "${use_coverage}" == "true" ]] && [[ -d "${coverage_date_dir}" ]] && [[ -n "$(ls -A "${coverage_date_dir}" 2>/dev/null)" ]]; then
+        print_info "Coverage: ${coverage_date_dir}/index.html"
     fi
 
     exit ${overall_exit}

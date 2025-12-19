@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Generate markdown test reports from log files
+# Supports both date-stamped folders (YYYY-MM-DD) and flat structure (backward compatibility)
 
 set -euo pipefail
 
@@ -10,19 +11,24 @@ REPORTS_DIR="${RESULTS_DIR}/reports"
 # Ensure directories exist
 mkdir -p "${LOGS_DIR}" "${REPORTS_DIR}"
 
-cd "${LOGS_DIR}"
+# Process a log file and generate report
+process_log_file() {
+    local log_file="$1"
+    local reports_target_dir="$2"
 
-for log_file in *.log; do
     if [[ ! -f "${log_file}" ]]; then
-        continue
+        return 0
     fi
 
     # Extract test name and timestamp from filename
     # Format: testname-YYYYMMDD-HHMMSS.log
-    base_name="${log_file%.log}"
+    local base_name="${log_file##*/}"
+    base_name="${base_name%.log}"
 
     # Handle format: testname-YYYYMMDD-HHMMSS
     # Try to match timestamp pattern at the end
+    local test_name
+    local timestamp
     if [[ "${base_name}" =~ ^(.+)-([0-9]{8}-[0-9]{6})$ ]]; then
         test_name="${BASH_REMATCH[1]}"
         timestamp="${BASH_REMATCH[2]}"
@@ -33,6 +39,7 @@ for log_file in *.log; do
     fi
 
     # Parse timestamp for human-readable format
+    local year month day hour min sec readable_date
     if [[ "${timestamp}" =~ ^([0-9]{4})([0-9]{2})([0-9]{2})-([0-9]{2})([0-9]{2})([0-9]{2})$ ]]; then
         year="${BASH_REMATCH[1]}"
         month="${BASH_REMATCH[2]}"
@@ -46,6 +53,7 @@ for log_file in *.log; do
     fi
 
     # Extract summary statistics
+    local examples failures warnings
     examples=$(grep -oE '[0-9]+ examples' "${log_file}" | tail -1 | grep -oE '[0-9]+' || echo "0")
     failures=$(grep -oE '[0-9]+ failures' "${log_file}" | tail -1 | grep -oE '[0-9]+' || echo "0")
     warnings=$(grep -oE '[0-9]+ warnings' "${log_file}" | tail -1 | grep -oE '[0-9]+' || echo "0")
@@ -54,6 +62,7 @@ for log_file in *.log; do
     # ShellSpec formats:
     #   1. "    test description (FAILED - N)"
     #   2. "shellspec file:line # N) Full description FAILED"
+    local failed_tests
     failed_tests=$(grep -E "FAILED" "${log_file}" | \
         sed -E 's/\x1b\[[0-9;]*m//g' | \
         sed -E 's/.*# [0-9]+\)\s*([^W]*?)\s*FAILED.*/\1/' | \
@@ -71,6 +80,7 @@ for log_file in *.log; do
     # ShellSpec formats:
     #   1. "    test description (WARNED - N)"
     #   2. "shellspec file:line # N) Full description WARNED"
+    local warned_tests
     warned_tests=$(grep -E "WARNED" "${log_file}" | \
         sed -E 's/\x1b\[[0-9;]*m//g' | \
         sed -E 's/.*# [0-9]+\)\s*([^W]*?)\s*WARNED.*/\1/' | \
@@ -84,8 +94,9 @@ for log_file in *.log; do
         sort -u | \
         head -50 || echo "")
 
-    # Generate markdown report
-    md_file="${REPORTS_DIR}/${log_file%.log}.md"
+    # Generate markdown report in target reports directory
+    local md_file="${reports_target_dir}/${base_name}.md"
+    mkdir -p "${reports_target_dir}"
 
     {
         cat <<EOF
@@ -162,8 +173,58 @@ EOF
     # Remove log file after successful report generation (full log is included in report)
     rm -f "${log_file}"
     echo "  Removed: ${log_file}"
-done
+}
 
-echo ""
-echo "All reports generated successfully."
-echo "Reports saved to: ${REPORTS_DIR}"
+# Main processing
+main() {
+    # Process date-stamped log directories (new structure)
+    for log_date_dir in "${LOGS_DIR}"/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]; do
+        if [[ ! -d "${log_date_dir}" ]]; then
+            continue
+        fi
+
+        # Extract date folder name (YYYY-MM-DD)
+        local date_folder
+        date_folder=$(basename "${log_date_dir}")
+
+        # Create corresponding reports date directory
+        local reports_date_dir="${REPORTS_DIR}/${date_folder}"
+
+        echo "Processing logs in ${date_folder}/..."
+
+        # Process all log files in this date directory
+        while IFS= read -r -d '' log_file; do
+            process_log_file "${log_file}" "${reports_date_dir}"
+        done < <(find "${log_date_dir}" -maxdepth 1 -type f -name "*.log" -print0 2>/dev/null)
+
+        echo ""
+    done
+
+    # Process log files directly in LOGS_DIR (backward compatibility - files without date folders)
+    if [[ -d "${LOGS_DIR}" ]]; then
+        while IFS= read -r -d '' log_file; do
+            # Extract date from filename to determine target reports directory
+            local base_name="${log_file##*/}"
+            base_name="${base_name%.log}"
+
+            local date_folder="${REPORTS_DIR}"  # Default to root reports dir
+            if [[ "${base_name}" =~ ^(.+)-([0-9]{8}-[0-9]{6})$ ]]; then
+                local timestamp="${BASH_REMATCH[2]}"
+                if [[ "${timestamp}" =~ ^([0-9]{4})([0-9]{2})([0-9]{2}) ]]; then
+                    local year="${BASH_REMATCH[1]}"
+                    local month="${BASH_REMATCH[2]}"
+                    local day="${BASH_REMATCH[3]}"
+                    date_folder="${REPORTS_DIR}/${year}-${month}-${day}"
+                fi
+            fi
+
+            process_log_file "${log_file}" "${date_folder}"
+        done < <(find "${LOGS_DIR}" -maxdepth 1 -type f -name "*.log" -print0 2>/dev/null)
+    fi
+
+    echo ""
+    echo "All reports generated successfully."
+    echo "Reports saved to: ${REPORTS_DIR} (organized by date: YYYY-MM-DD/)"
+}
+
+main "$@"

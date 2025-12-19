@@ -57,7 +57,11 @@ main() {
 
     local timestamp
     timestamp=$(get_timestamp)
-    local log_file="${LOGS_DIR}/unit-tests-${timestamp}.log"
+    local date_folder
+    date_folder=$(get_date_folder "${timestamp}")
+    local logs_date_dir
+    logs_date_dir=$(get_logs_dir "${date_folder}")
+    local log_file="${logs_date_dir}/unit-tests-${timestamp}.log"
 
     # Build test paths
     local test_paths=()

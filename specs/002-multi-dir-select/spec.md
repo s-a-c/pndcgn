@@ -145,6 +145,10 @@ When fzf is not installed or fails to launch, the system provides a fallback mec
   - Output files are distinguished by their abbreviated source directory prefix (e.g., `proj--file.pdf`, `docs--file.pdf`)
 - What happens when directory names share common prefixes (e.g., `project-a`, `project-b`)?
   - System computes shortest unique abbreviation for each (e.g., `a--file.pdf`, `b--file.pdf` or `proj-a--file.pdf`, `proj-b--file.pdf`)
+- What happens when a directory is deleted between fzf selection and processing start, or deleted mid-processing?
+  - System treats deleted directories as unreadable (graceful degradation): logs a WARN message for that directory and continues processing the remaining directories. If all directories are deleted/unreadable, system exits with error code 1.
+- What happens when the config file (pndcgn.toml) is malformed (syntax error)?
+  - System uses default `max_source_dirs=4` and logs a WARN message: `"Config file parse error: $error, using default max_source_dirs=4"`
 
 ---
 
@@ -207,5 +211,11 @@ When fzf is not installed or fails to launch, the system provides a fallback mec
 - Source directory names are filesystem-safe and can be used in output filenames (special characters will be sanitized)
 - For CLI multi-source, target directory must be explicitly specified via `--output`/`-o` flag or `--` separator to avoid ambiguity
 - Memory and resource usage scales linearly with number of directories (processing 16 directories requires ~16× single-directory memory, within reasonable limits for typical document sizes)
+- Configuration file (`pndcgn.toml`) follows base pndcgn config discovery mechanism:
+  - **Config file location**: `pndcgn.toml` is searched in the following order:
+    1. Current working directory (`./pndcgn.toml`)
+    2. XDG config directory (`$XDG_CONFIG_HOME/pndcgn/pndcgn.toml` or `$HOME/.config/pndcgn/pndcgn.toml` if XDG_CONFIG_HOME is unset)
+    3. Source directory (first source directory's `pndcgn.toml` if available)
+  - First matching config file is used; later matches are ignored
 
 ---

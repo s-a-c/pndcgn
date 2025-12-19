@@ -964,6 +964,13 @@ pndcgn_compute_abbreviated_prefixes() {
         return 0
     fi
 
+    # Q3: Single directory - return full basename
+    if [[ ${#dirs[@]} -eq 1 ]]; then
+        local basename="${dirs[0]##*/}"
+        printf '%s\n' "$basename"
+        return 0
+    fi
+
     local -a basenames=()
     local -a dirnames=()  # Parent directory names for disambiguation
     local -a prefixes=()
@@ -983,39 +990,143 @@ pndcgn_compute_abbreviated_prefixes() {
         fi
     done
 
-    # For each basename, find shortest unique prefix
+    # Q1: Find and strip common prefix among all basenames
+    local common_prefix=""
+    if [[ ${#basenames[@]} -gt 1 ]]; then
+        local first_name="${basenames[0]}"
+        local min_len=${#first_name}
+        for name in "${basenames[@]}"; do
+            [[ ${#name} -lt $min_len ]] && min_len=${#name}
+        done
+
+        # Find longest common prefix (check character by character)
+        for ((len=1; len<=min_len; len++)); do
+            local candidate="${first_name:0:$len}"
+            local all_match=true
+            for name in "${basenames[@]}"; do
+                if [[ "${name:0:$len}" != "$candidate" ]]; then
+                    all_match=false
+                    break
+                fi
+            done
+            if [[ $all_match == true ]]; then
+                common_prefix="$candidate"
+            else
+                break
+            fi
+        done
+    fi
+
+    # Q2 & Q4: For each basename, find shortest unique prefix after common prefix
+    # Prefer longer, more readable prefixes when possible
     for i in "${!basenames[@]}"; do
         local name="${basenames[$i]}"
-        local prefix_len=1
-        local unique=false
+        # Remove common prefix if present
+        local name_suffix="$name"
+        if [[ -n "$common_prefix" ]] && [[ "${name:0:${#common_prefix}}" == "$common_prefix" ]]; then
+            name_suffix="${name:${#common_prefix}}"
+        fi
 
-        # Try to find unique prefix by comparing characters
-        while [[ $unique == false ]] && [[ $prefix_len -le ${#name} ]]; do
-            local candidate="${name:0:$prefix_len}"
+        # Start with minimum meaningful prefix length (3 characters) for readability
+        local min_prefix_len=3
+        local prefix_len
+        if [[ ${#name_suffix} -ge $min_prefix_len ]]; then
+            prefix_len=$min_prefix_len
+        else
+            prefix_len=${#name_suffix}  # Use full suffix if shorter than min
+        fi
+        local unique=false
+        local shortest_unique_len=0
+
+        # First pass: find shortest unique prefix length
+        while [[ $prefix_len -le ${#name_suffix} ]]; do
+            local candidate="${name_suffix:0:$prefix_len}"
             unique=true
 
             for j in "${!basenames[@]}"; do
                 [[ $i -eq $j ]] && continue
                 local other="${basenames[$j]}"
-                if [[ "${other:0:$prefix_len}" == "$candidate" ]]; then
+                local other_suffix="$other"
+                if [[ -n "$common_prefix" ]] && [[ "${other:0:${#common_prefix}}" == "$common_prefix" ]]; then
+                    other_suffix="${other:${#common_prefix}}"
+                fi
+                if [[ "${other_suffix:0:$prefix_len}" == "$candidate" ]]; then
                     unique=false
-                    ((prefix_len++))
                     break
                 fi
             done
+
+            if [[ $unique == true ]]; then
+                shortest_unique_len=$prefix_len
+                break
+            fi
+            ((prefix_len++))
         done
 
-        local prefix="${name:0:$prefix_len}"
+        # Q4: Prefer 4-5 character prefixes if readability is enhanced whilst remaining unique
+        # Find shortest unique, then prefer 4-5 chars when they enhance readability (prefer shorter when both unique)
+        if [[ $shortest_unique_len -gt 0 ]]; then
+            prefix_len=$shortest_unique_len
+            # Prefer 4-5 character prefixes for readability when they enhance readability
+            local min_readable_len=4
+            local max_readable_len=5
+            [[ $max_readable_len -gt ${#name_suffix} ]] && max_readable_len=${#name_suffix}
+
+            # Find shortest length >= 4 that's unique (prefer shorter when both 4 and 5 are unique)
+            local best_readable_len=0
+            for ((len=min_readable_len; len<=max_readable_len && len<=${#name_suffix}; len++)); do
+                local candidate="${name_suffix:0:$len}"
+                unique=true
+                for j in "${!basenames[@]}"; do
+                    [[ $i -eq $j ]] && continue
+                    local other="${basenames[$j]}"
+                    local other_suffix="$other"
+                    if [[ -n "$common_prefix" ]] && [[ "${other:0:${#common_prefix}}" == "$common_prefix" ]]; then
+                        other_suffix="${other:${#common_prefix}}"
+                    fi
+                    if [[ "${other_suffix:0:$len}" == "$candidate" ]]; then
+                        unique=false
+                        break
+                    fi
+                done
+                if [[ $unique == true ]]; then
+                    best_readable_len=$len
+                    break  # Found shortest readable length, use it (prefer shorter)
+                fi
+            done
+
+            # Use best readable length if found, otherwise use shortest unique
+            if [[ $best_readable_len -gt 0 ]]; then
+                prefix_len=$best_readable_len
+            else
+                prefix_len=$shortest_unique_len
+            fi
+        else
+            # No unique prefix found, use parent directory for disambiguation
+            prefix_len=${#name_suffix}
+        fi
+
+        # Combine common prefix with unique suffix
+        local prefix
+        if [[ -n "$common_prefix" ]]; then
+            prefix="${name_suffix:0:$prefix_len}"
+        else
+            prefix="${name:0:$(( ${#common_prefix} + prefix_len ))}"
+        fi
 
         # If we still don't have uniqueness at full length, use parent directory
-        if [[ $unique == false ]] || [[ $prefix_len -gt ${#name} ]]; then
+        if [[ $shortest_unique_len -eq 0 ]] || [[ $prefix_len -gt ${#name_suffix} ]]; then
             local parent="${dirnames[$i]}"
             if [[ -n "$parent" ]]; then
                 # Use parent directory name as prefix component
                 # Sanitize parent name (replace non-alphanumeric with hyphens)
                 local sanitized_parent
                 sanitized_parent=$(printf "%s" "$parent" | sed 's/[^[:alnum:]]/-/g')
-                prefix="${sanitized_parent}-${name}"
+                if [[ -n "$common_prefix" ]]; then
+                    prefix="${sanitized_parent}-${name_suffix}"
+                else
+                    prefix="${sanitized_parent}-${name}"
+                fi
             else
                 # No parent, use full basename
                 prefix="$name"

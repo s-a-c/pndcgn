@@ -164,9 +164,10 @@ EOF
     # columns containing valid JSON. The source_dirs column stores a JSON array of directory paths.
     # Check if column already exists before adding (SQLite doesn't support IF NOT EXISTS for ALTER TABLE)
     local column_exists
-    column_exists=$(sqlite3 "$db_path" "PRAGMA table_info(runs);" | grep -c "source_dirs" || printf "0")
+    # Use SQLite's pragma_table_info for reliable column existence check
+    column_exists=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM pragma_table_info('runs') WHERE name='source_dirs';" 2>/dev/null || printf "0")
 
-    if [[ "$column_exists" -eq 0 ]]; then
+    if [[ "${column_exists:-0}" -eq 0 ]]; then
         # Column doesn't exist, add it
         # Type TEXT stores JSON array string (e.g., '["/path/to/dir1", "/path/to/dir2"]')
         sqlite3 "$db_path" "ALTER TABLE runs ADD COLUMN source_dirs TEXT;" 2>/dev/null || true

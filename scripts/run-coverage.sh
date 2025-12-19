@@ -63,14 +63,19 @@ main() {
             ;;
     esac
 
-    # Open coverage report if available
-    local coverage_index="${COVERAGE_DIR}/index.html"
+    # Open coverage report if available (use today's date folder)
+    local date_folder
+    date_folder=$(get_date_folder)
+    local coverage_date_dir
+    coverage_date_dir=$(get_coverage_dir "${date_folder}")
+    local coverage_index="${coverage_date_dir}/index.html"
     if [[ -f "${coverage_index}" ]]; then
         echo ""
         print_success "Coverage report generated: ${coverage_index}"
         print_info "Open with: open ${coverage_index}"
     else
         print_warning "Coverage report not generated. Check logs for errors."
+        print_info "Expected location: ${coverage_index}"
     fi
 }
 

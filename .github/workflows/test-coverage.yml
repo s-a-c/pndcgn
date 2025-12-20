@@ -69,12 +69,30 @@ jobs:
         run: |
           # Ensure shellspec is in PATH
           export PATH="$HOME/.local/bin:$PATH"
+          # Run tests with kcov coverage
           shellspec --kcov --format documentation
 
       - name: Generate coverage reports
         run: |
           if [ -f tests.results/generate-reports.sh ]; then
             tests.results/generate-reports.sh
+          fi
+
+      - name: Find and prepare coverage file
+        run: |
+          # ShellSpec/kcov generates coverage in tests.results/coverage/
+          # Find the cobertura.xml file (may be in date-stamped subdirectory)
+          COVERAGE_FILE=$(find tests.results/coverage -name "cobertura.xml" -type f | head -1)
+          if [ -n "$COVERAGE_FILE" ]; then
+            echo "Found coverage file: $COVERAGE_FILE"
+            # Copy to a standard location for Codecov
+            mkdir -p tests.results/coverage
+            cp "$COVERAGE_FILE" tests.results/coverage/cobertura.xml
+            echo "Coverage file prepared: tests.results/coverage/cobertura.xml"
+            ls -lh tests.results/coverage/cobertura.xml
+          else
+            echo "Warning: cobertura.xml not found. Coverage may not be uploaded."
+            find tests.results/coverage -type f | head -10 || true
           fi
 
       - name: Upload coverage artifacts
@@ -87,10 +105,15 @@ jobs:
             tests.results/reports/
           retention-days: 30
 
-      - name: Upload to Codecov (if configured)
+      - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         if: always()
         with:
           files: tests.results/coverage/cobertura.xml
+          # Token is optional for public repos, required for private repos
+          # Add CODECOV_TOKEN secret in GitHub repo settings if needed
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
+          # Codecov configuration file
+          config: codecov.yml

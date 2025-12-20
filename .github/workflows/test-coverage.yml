@@ -52,16 +52,15 @@ jobs:
 
       - name: Install kcov
         run: |
-          # Build kcov from source (v44+ required for ShellSpec compatibility)
-          git clone --depth=1 --branch v44 https://github.com/SimonKagstrom/kcov.git /tmp/kcov || \
-            (git clone --depth=1 https://github.com/SimonKagstrom/kcov.git /tmp/kcov && \
-             cd /tmp/kcov && \
-             git fetch --tags && \
-             git checkout v44 2>/dev/null || git checkout v40 2>/dev/null || git checkout v38 2>/dev/null || true)
+          # Build kcov from source (v43 is latest stable, v44 only has pre-release tags)
+          git clone --depth=1 https://github.com/SimonKagstrom/kcov.git /tmp/kcov
           cd /tmp/kcov
+          # Use v43 (latest stable) or fallback to master if tag doesn't exist
+          git fetch --tags --depth=1
+          git checkout v43 2>/dev/null || git checkout master || true
           mkdir build && cd build
           cmake ..
-          make
+          make -j$(nproc)
           sudo make install
           rm -rf /tmp/kcov
           kcov --version

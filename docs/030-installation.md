@@ -26,7 +26,7 @@
 
 ---
 
-**Compliant with**: AI-GUIDELINES.md v1.0
+Compliant with [AGENTS.md](../AGENTS.md) v8734620507988c6a9e6316900bfc9ff60394b1e358fadc2a6d223c5724583688
 
 ## 1. Prerequisites
 
@@ -45,7 +45,14 @@ pandoc      # Document conversion
 awk         # Text processing
 sed         # Stream editor
 find        # File traversal
+curl        # For downloading sqlite-ulid extension
 ```
+
+**SQLite Extension**:
+- `sqlite-ulid` extension is automatically downloaded on first run
+- Stored in `./lib/` directory (relative to script location)
+- Requires internet connection for initial download
+- Supported platforms: Linux (x86_64), macOS (x86_64, arm64)
 
 **Disk Space**:
 - Minimum 50MB for tool + dependencies
@@ -125,7 +132,7 @@ brew install jq tree
 **If part of larger repository**:
 ```bash
 # Navigate to tool location
-cd /path/to/dot-ai/tools/pdf-generator
+cd /path/to/dot-ai/tools/pndcgn
 ```
 
 **If standalone installation**:
@@ -150,10 +157,10 @@ ls -1
 **Create configuration file**:
 ```bash
 # Run initialization
-./bin/pdf-generator --init
+./bin/pndcgn --init
 
 # Or manually create
-cat > pdf-generator.toml <<'EOF'
+cat > pndcgn.toml <<'EOF'
 # pndcgn Configuration
 [general]
 output_type = "pdf"
@@ -175,7 +182,7 @@ export XDG_STATE_HOME="${HOME}/.local/state"
 
 # Or set custom location in config
 sed -i 's|cache_location = ".*"|cache_location = "/custom/path/pndcgn"|' \
-    pdf-generator.toml
+    pndcgn.toml
 ```
 
 **Create database directories**:
@@ -192,27 +199,27 @@ chmod 755 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn"
 **Check tool is executable**:
 ```bash
 # Make script executable
-chmod +x ./bin/pdf-generator
+chmod +x ./bin/pndcgn
 
 # Verify version
-./bin/pdf-generator --version
+./bin/pndcgn --version
 # Expected: pndcgn v6 (or current version)
 ```
 
 **Test database connectivity**:
 ```bash
 # Initialize database schema
-./bin/pdf-generator --init
+./bin/pndcgn --init
 
 # Verify tables exist
 sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" \
     ".tables"
-# Expected: runs  generated_pdfs
+# Expected: runs  generated_artifacts
 ```
 
 **Display help**:
 ```bash
-./bin/pdf-generator --help
+./bin/pndcgn --help
 # Should show usage information
 ```
 
@@ -223,9 +230,9 @@ sqlite3 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite" \
 ### 3.1. Tool Layout
 
 ```log
-pdf-generator/
+pndcgn/
 ├── bin/
-│   └── pdf-generator           # Main executable
+│   └── pndcgn                  # Main executable
 ├── src/
 │   ├── constants.sh            # ANSI color constants
 │   ├── database.sh             # SQLite operations
@@ -240,7 +247,7 @@ pdf-generator/
 ├── specs/                      # shellspec tests
 │   ├── spec_helper.sh
 │   └── ...
-├── pdf-generator.toml          # Configuration
+├── pndcgn.toml                 # Configuration
 └── README.md                   # Quick start guide
 ```
 
@@ -271,7 +278,7 @@ ${TARGET_PARENT}/pndcgn/
 
 ### 4.1. TOML Configuration
 
-**Default configuration** (`pdf-generator.toml`):
+**Default configuration** (`pndcgn.toml`):
 ```toml
 # General Settings
 [general]
@@ -338,13 +345,13 @@ This is a test.
 EOF
 
 # Run in dry-run mode
-/path/to/bin/pdf-generator --dry-run source
+/path/to/bin/pndcgn --dry-run source
 
 # Check output
-# Expected: Run ID displayed, no PDFs created
+# Expected: Run ID displayed, no outputs created
 
 # Run actual generation
-/path/to/bin/pdf-generator source
+/path/to/bin/pndcgn source
 
 # Verify output exists
 ls pndcgn/pdf-*/test.pdf
@@ -359,10 +366,10 @@ rm -rf /tmp/pndcgn-test
 
 **Common issues**:
 
-**Issue**: "command not found: pdf-generator"
+**Issue**: "command not found: pndcgn"
 ```bash
 # Solution: Add to PATH or use absolute path
-export PATH="/path/to/pdf-generator/bin:${PATH}"
+export PATH="/path/to/pndcgn/bin:${PATH}"
 ```
 
 **Issue**: "sqlite3: command not found"
@@ -389,7 +396,7 @@ rm -f "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/cache.sqlite-wal"
 **Issue**: "Permission denied"
 ```bash
 # Solution: Fix permissions
-chmod +x /path/to/bin/pdf-generator
+chmod +x /path/to/bin/pndcgn
 chmod 755 "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn"
 ```
 
@@ -407,10 +414,10 @@ pandoc --version
 **Getting help**:
 ```bash
 # Display usage information
-./bin/pdf-generator --help
+./bin/pndcgn --help
 
 # Enable verbose mode for debugging
-./bin/pdf-generator --verbose source_dir
+./bin/pndcgn --verbose source_dir
 
 # Check log files (if implemented)
 tail -f "${XDG_STATE_HOME:-${HOME}/.local/state}/pndcgn/pndcgn.log"

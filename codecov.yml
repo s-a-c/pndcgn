@@ -1,0 +1,109 @@
+# Codecov Configuration
+#
+# Compliant with [AGENTS.md](AGENTS.md)
+#
+# Purpose: Configure Codecov coverage reporting for pndcgn project
+
+codecov:
+  # Require coverage reports for all commits
+  require_ci_to_pass: false
+
+  # Notify settings
+  notify:
+    wait_for_ci: true
+
+# Coverage settings
+coverage:
+  # Precision: number of decimal places for coverage percentages
+  precision: 2
+
+  # Round coverage values (down, up, or nearest)
+  round: nearest
+
+  # Range: minimum and maximum coverage values to display
+  range: "70...100"
+
+  # Status settings
+  status:
+    # Project-level status
+    project:
+      default:
+        # Target coverage percentage (90% per Constitution §II)
+        target: 90%
+        # Threshold for failure (85% - warn but don't fail)
+        threshold: 85%
+        # Base for comparison (auto, parent, or commit)
+        base: auto
+        # Flags to include
+        flags: null
+        # Only post status if coverage changes
+        only_pulls: false
+
+    # Patch-level status (for PRs)
+    patch:
+      default:
+        target: 90%
+        threshold: 85%
+        base: auto
+        only_pulls: true
+
+    # Changes status (coverage changes in PR)
+    changes:
+      default:
+        target: 90%
+        threshold: 85%
+        base: auto
+        only_pulls: true
+
+# Comment settings for PRs
+comment:
+  # Layout: how to display coverage in PR comments
+  layout: "reach,diff,flags,tree,reach"
+
+  # Behavior: when to post comments
+  behavior: default
+
+  # Require base coverage to post
+  require_base: false
+
+  # Require head coverage to post
+  require_head: true
+
+# Flags for different test suites
+flags:
+  unit:
+    paths:
+      - src/utilities.sh
+      - src/database.sh
+      - src/processing.sh
+    carryforward: true
+
+  integration:
+    paths:
+      - src/
+    carryforward: true
+
+  feature:
+    paths:
+      - src/
+    carryforward: true
+
+# Ignore patterns (files/directories to exclude from coverage)
+ignore:
+  - "tests/**"
+  - "tests.results/**"
+  - "scripts/**"
+  - "docs/**"
+  - "specs/**"
+  - ".github/**"
+  - ".specify/**"
+  - "*.md"
+  - "*.yml"
+  - "*.yaml"
+  - "*.toml"
+  - "*.sh"  # Only ignore non-source shell scripts
+  - "bin/pndcgn"  # Main entry point (tested via integration tests)
+
+# GitHub integration
+github_checks:
+  annotations: true

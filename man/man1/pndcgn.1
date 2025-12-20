@@ -1,0 +1,194 @@
+.TH PNDCGN 1 "2025-12-14" "pndcgn v0.1.0" "User Commands"
+.SH NAME
+pndcgn \- Documentation Generation Tool
+.SH SYNOPSIS
+.B pndcgn
+[\fIOPTIONS\fR] [\fISOURCE_DIR\fR] [\fITARGET_DIR\fR]
+.SH DESCRIPTION
+.B pndcgn
+is a robust, configurable command-line tool for converting Markdown-based
+documentation sources into organized output sets (PDF, HTML, EPUB, DOCX, etc.)
+using Pandoc with intelligent caching and resumable runs.
+.PP
+The tool discovers documentation files in a source directory, converts them
+using Pandoc, and organizes the outputs in a structured directory with an
+index for easy navigation. It features intelligent caching to avoid regenerating
+unchanged files, dry-run mode for previewing operations, and the ability to
+resume interrupted runs.
+.SH ARGUMENTS
+.TP
+\fBSOURCE_DIR\fR
+Source directory containing documentation files (default: current directory).
+If not provided and running interactively, the tool may use fzf for directory
+selection.
+.TP
+\fBTARGET_DIR\fR
+Target directory for generated outputs (default: current directory). Outputs
+are placed in \fB\fITARGET_DIR\fR/.pndcgn/\fITYPE\fR-\fIRUN_ID\fR/\fR.
+.SH OPTIONS
+.TP
+\fB--type\fR \fITYPE\fR
+Output type/format (default: pdf). Supported types include all Pandoc formats:
+pdf, html, epub, docx, odt, rtf, and others. See \fBpandoc --list-output-formats\fR
+for complete list.
+.TP
+\fB--dry-run\fR
+Preview mode: compute what would be generated without creating output artifacts.
+Prints a run ID that can be used with \fB--finalize\fR to execute the plan later.
+.TP
+\fB--finalize\fR \fIRUN_ID\fR
+Finalize a prior dry-run. Validates that inputs and configuration are unchanged
+since the dry-run, then generates the outputs. Fails with an error if anything
+has changed.
+.TP
+\fB--resume\fR \fIRUN_ID\fR
+Resume an interrupted or partial run. Skips already-processed files and continues
+from where it left off. Validates fingerprint to ensure source files haven't changed.
+.TP
+\fB--force\fR
+Bypass cache and regenerate all files, even if they haven't changed.
+.TP
+\fB--reseed\fR
+Re-seed the \fB.pndcgnignore\fR file from current ignore rules (typically
+from \fB.gitignore\fR). Useful when ignore patterns have changed.
+.TP
+\fB--clean\fR \fIRUN_ID\fR [\fIRUN_ID\fR ...]
+Remove outputs for one or more specified run IDs. Requires confirmation unless
+\fB--yes\fR is used. Validates that output directories contain only pndcgn artifacts.
+.TP
+\fB--drop\fR
+Clear all cache and state data. This removes the entire database and all cached
+information. Requires confirmation unless \fB--yes\fR is used.
+.TP
+\fB--yes\fR
+Skip confirmation prompts. Required in non-interactive environments (e.g., CI/CD).
+.TP
+\fB--verbose\fR
+Enable verbose output with detailed progress information.
+.TP
+\fB--quiet\fR, \fB-q\fR
+Suppress non-error output. Only errors and warnings are displayed.
+.TP
+\fB--version\fR, \fB-v\fR
+Display version information and exit.
+.TP
+\fB--help\fR, \fB-h\fR
+Display help message and exit.
+.SH CONFIGURATION
+.SS Ignore Patterns
+The tool uses a \fB.pndcgnignore\fR file in the source directory to exclude files
+from processing. This file is auto-created on first run by seeding from \fB.gitignore\fR
+if present. Patterns follow the same syntax as \fB.gitignore\fR.
+.SS TOML Configuration
+Optional configuration can be provided via a TOML file. The tool searches for
+\fBpndcgn.toml\fR in the following order:
+.IP 1. 4
+XDG config directory: \fB${XDG_CONFIG_HOME:-$HOME/.config}/pndcgn/pndcgn.toml\fR
+.IP 2. 4
+Source directory root: \fB\fISOURCE_DIR\fR/pndcgn.toml\fR
+.PP
+The TOML file can specify include patterns, file extensions, and other options.
+See the documentation for the complete configuration format.
+.SH EXAMPLES
+Generate PDFs from the current directory:
+.RS
+.B pndcgn
+.RE
+.PP
+Generate HTML from a specific source directory:
+.RS
+.B pndcgn --type html docs/ output/
+.RE
+.PP
+Preview what would be generated:
+.RS
+.B pndcgn --dry-run
+.RE
+.PP
+Finalize a dry-run:
+.RS
+.B pndcgn --finalize 01ARZ3NDEKTSV4Y5QH6J7K8M9
+.RE
+.PP
+Resume an interrupted run:
+.RS
+.B pndcgn --resume 01ARZ3NDEKTSV4Y5QH6J7K8M9
+.RE
+.PP
+Clean up old run outputs:
+.RS
+.B pndcgn --clean 01ARZ3NDEKTSV4Y5QH6J7K8M9 01ARZ3NDEKTSV4Y5QH6J7K8M0
+.RE
+.SH EXIT CODES
+.TP
+.B 0
+Success
+.TP
+.B 1
+Runtime error (e.g., file not found, permission denied, processing failure)
+.TP
+.B 2
+Invalid usage (e.g., unknown option, missing required argument)
+.SH FILES
+.TP
+\fB.pndcgnignore\fR
+Ignore patterns file in source directory (auto-created on first run)
+.TP
+\fBpndcgn.toml\fR
+Optional TOML configuration file (in XDG config dir or source directory)
+.TP
+\fB${XDG_STATE_HOME:-$HOME/.local/state}/pndcgn/pndcgn.db\fR
+SQLite database storing run history and cache information
+.TP
+\fB\fITARGET_DIR\fR/.pndcgn/\fITYPE\fR-\fIRUN_ID\fR/\fR
+Output directory for generated artifacts
+.SH ENVIRONMENT
+.TP
+\fBNO_COLOR\fR
+If set, disables ANSI color output (see https://no-color.org/)
+.TP
+\fBXDG_CONFIG_HOME\fR
+Base directory for user-specific configuration files (default: \fB$HOME/.config\fR)
+.TP
+\fBXDG_STATE_HOME\fR
+Base directory for user-specific state files (default: \fB$HOME/.local/state\fR)
+.TP
+\fBTERM\fR
+Terminal type. If unset or set to "dumb", colors and animations are disabled.
+.SH DEPENDENCIES
+.B pndcgn
+requires the following external tools:
+.TP
+.B pandoc
+Document conversion engine (version 2.0+ recommended)
+.TP
+.B sqlite3
+SQLite database engine for state and cache management
+.TP
+.B curl
+Used for downloading sqlite-ulid extension (optional, falls back to Bash-based ULID)
+.PP
+Optional dependencies:
+.TP
+.B fzf
+Fuzzy finder for interactive directory selection (falls back to current directory if unavailable)
+.SH SEE ALSO
+.BR pandoc (1),
+.BR sqlite3 (1),
+.BR gitignore (5)
+.PP
+For detailed documentation, configuration examples, and troubleshooting, see:
+.IP \(bu 2
+Project README: \fBREADME.md\fR
+.IP \(bu 2
+Configuration guide: \fBdocs/toml-config-defaults.md\fR
+.IP \(bu 2
+Migration examples: \fBdocs/migration-examples.md\fR
+.IP \(bu 2
+Troubleshooting guide: \fBdocs/troubleshooting.md\fR
+.SH BUGS
+Report bugs and issues at the project repository.
+.SH AUTHOR
+pndcgn development team
+.SH COPYRIGHT
+Copyright (c) 2025. See LICENSE file for details.

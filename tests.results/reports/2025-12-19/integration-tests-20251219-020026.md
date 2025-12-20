@@ -1,0 +1,30 @@
+# Test Results Report: integration-tests
+
+**Test File**: `tests/integration-tests.sh`
+**Execution Time**: 2025-12-19 02:00:26
+**Timestamp**: 20251219-020026
+
+---
+
+## Summary
+
+| Metric | Count |
+|--------|-------|
+| **Total Examples** | 0 |
+| **Failures** | 0 |
+| **Warnings** | 0 |
+| **Success Rate** | N/A |
+
+### Status
+✅ **All tests passed**
+
+---
+
+<details>
+<summary><strong>Full Test Log</strong></summary>
+
+```log
+Unrecognized option: --kcov-dir
+```
+
+</details>

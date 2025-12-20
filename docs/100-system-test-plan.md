@@ -62,6 +62,13 @@ This system test plan validates end-to-end workflows and ensures requirements (R
 - Pandoc 2.x+
 - shellspec (testing framework)
 
+**Test Execution**:
+- Run tests: `./scripts/run-all-tests.sh` or `shellspec`
+- Run specific suite: `./scripts/run-unit-tests.sh`, `./scripts/run-integration-tests.sh`
+- Run with coverage: `./scripts/run-coverage.sh all` (works best on Linux)
+- Local CI: `./scripts/local-ci.sh`
+- See `tests/README.md` and `scripts/README.md` for details
+
 **Test data**:
 ```log
 fixtures/
@@ -93,6 +100,22 @@ fixtures/
 | ST-013 | REQ-013 | Interruption and resumption |
 | ST-014 | REQ-014 | ANSI color output |
 | ST-015 | REQ-015 | Dry-run and finalization |
+| ST-017 | REQ-017 | Multiple directory selection via fzf |
+| ST-018 | REQ-018, REQ-031 | Configurable selection limit |
+| ST-019 | REQ-019 | Backward compatibility for single directory |
+| ST-020 | REQ-020 | Directory deduplication |
+| ST-021 | REQ-021, REQ-030 | Overlapping directory detection |
+| ST-022 | REQ-022 | Abbreviated source prefixes |
+| ST-023 | REQ-023 | CLI multi-directory support |
+| ST-024 | REQ-024 | Selection limit enforcement |
+| ST-025 | REQ-025 | fzf fallback for unavailability |
+| ST-026 | REQ-026 | Graceful degradation on directory failure |
+| ST-027 | REQ-027 | Zero directory selection handling |
+| ST-028 | REQ-028 | fzf header display |
+| ST-029 | REQ-029 | Logging conventions |
+| ST-033 | REQ-033 | All directories fail handling |
+| ST-034 | REQ-034 | Ctrl+C graceful handling |
+| ST-035 | REQ-035 | Fallback invalid input handling |
 
 ---
 
@@ -209,14 +232,14 @@ Describe 'ST-003: Basic generation'
     mkdir -p /tmp/test
     echo "# Test" > /tmp/test/simple.md
   }
-  
+
   It 'generates PDF from markdown'
     When run bin/pdf-generator /tmp/test
     The status should be success
     The output should include "1 processed"
     The path "/tmp/test/pndcgn/pdf-*/simple.pdf" should be file
   End
-  
+
   cleanup() {
     rm -rf /tmp/test
   }
@@ -257,10 +280,10 @@ Describe 'ST-004: Multiple formats'
   It 'generates PDF, EPUB, and HTML'
     When run bin/pdf-generator --type pdf /tmp/test
     The path "/tmp/test/pndcgn/pdf-*/simple.pdf" should be file
-    
+
     When run bin/pdf-generator --type epub /tmp/test
     The path "/tmp/test/pndcgn/epub-*/simple.epub" should be file
-    
+
     When run bin/pdf-generator --type html /tmp/test
     The path "/tmp/test/pndcgn/html-*/simple.html" should be file
   End
@@ -300,7 +323,7 @@ Describe 'ST-005: Caching'
     # First run
     When run bin/pdf-generator /tmp/test
     The output should include "3 processed"
-    
+
     # Second run
     When run bin/pdf-generator /tmp/test
     The output should include "3 skipped (cached)"
@@ -339,10 +362,10 @@ Describe 'ST-006: Cache invalidation'
   It 'regenerates modified files'
     # First run
     bin/pdf-generator /tmp/test
-    
+
     # Modify one file
     echo "Updated" >> /tmp/test/file1.md
-    
+
     # Second run
     When run bin/pdf-generator /tmp/test
     The output should include "1 processed"
@@ -416,7 +439,7 @@ Describe 'ST-008: Force regeneration'
   It 'ignores cache with --force'
     # First run
     bin/pdf-generator /tmp/test
-    
+
     # Force regeneration
     When run bin/pdf-generator --force /tmp/test
     The output should include "3 processed"
@@ -450,7 +473,7 @@ Describe 'ST-009: Clean cache'
   It 'removes old cache entries'
     # Create multiple runs
     create_old_runs
-    
+
     When run bin/pdf-generator --clean
     The status should be success
     The output should include "Removed"
@@ -578,7 +601,7 @@ Describe 'ST-013: Resumption'
   It 'resumes interrupted run'
     # Simulate partial run
     run_id=$(start_partial_run)
-    
+
     # Resume
     When run bin/pdf-generator --resume "${run_id}"
     The output should include "Resuming"
@@ -615,7 +638,7 @@ Describe 'ST-014: ANSI colors'
     When run bin/pdf-generator /tmp/test
     The output should include "\\033["
   End
-  
+
   It 'respects NO_COLOR'
     NO_COLOR=1
     When run bin/pdf-generator /tmp/test
@@ -660,10 +683,612 @@ Describe 'ST-015: Dry-run finalization'
     run_id=$(bin/pdf-generator --dry-run /tmp/test | extract_run_id)
     The path "/tmp/test/pndcgn/pdf-*/*.pdf" should not be file
   End
-  
+
   It 'generates files when finalized'
     When run bin/pdf-generator --finalize "${run_id}"
     The path "/tmp/test/pndcgn/pdf-*/*.pdf" should be file
+  End
+End
+```
+
+### 3.16. ST-017: Multiple Directory Selection via fzf
+
+**Requirement**: REQ-017
+
+**Objective**: Verify users can select multiple directories using fzf multi-select
+
+**Preconditions**:
+- fzf installed and available in PATH
+- Multiple source directories exist with markdown files
+- Tool launched without source directory argument
+
+**Test steps**:
+1. Run `pndcgn` (no arguments)
+2. Use Tab key to select multiple directories in fzf
+3. Press Enter to confirm selection
+4. Verify all selected directories processed
+5. Verify single run ID assigned
+6. Verify output files use abbreviated prefixes
+
+**Expected behavior**:
+```log
+$ pndcgn
+[launches fzf with multi-select]
+[Tab to select: ./docs, ./notes, ./specs]
+[Press Enter]
+
+Run ID: 01ABC123DEF456...
+Processing 3 directories:
+  [1/3] ./docs (12 files)
+  [2/3] ./notes (5 files)
+  [3/3] ./specs (8 files)
+
+✓ Run complete: 01ABC123DEF456...
+  Output: ./output/.pndcgn/pdf-01ABC123DEF456.../
+  Files: 25 processed
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-017: Multiple directory selection via fzf'
+  It 'processes all selected directories in single run'
+    # Mock fzf to return multiple directories
+    When call pndcgn_with_fzf_multi_select
+    The output should include "Processing 3 directories"
+    The output should match pattern "Run ID: [A-Z0-9]{26}"
+    The status should be success
+  End
+
+  It 'uses abbreviated prefixes for output files'
+    When call pndcgn_with_fzf_multi_select
+    The path "./output/.pndcgn/pdf-*/docs-*.pdf" should be file
+    The path "./output/.pndcgn/pdf-*/notes-*.pdf" should be file
+  End
+End
+```
+
+### 3.17. ST-018: Configurable Selection Limit
+
+**Requirement**: REQ-018, REQ-031
+
+**Objective**: Verify configurable selection limit with validation
+
+**Preconditions**:
+- pndcgn.toml config file accessible
+- fzf available
+
+**Test steps**:
+1. Set `max_source_dirs = 5` in pndcgn.toml
+2. Launch fzf and attempt to select 6 directories
+3. Verify 6th selection prevented
+4. Set `max_source_dirs = 20` (above max)
+5. Verify limit capped at 16 with warning
+
+**Expected behavior**:
+```log
+# With max_source_dirs = 5
+$ pndcgn
+[Selecting 5 directories works]
+[6th selection prevented]
+
+# With max_source_dirs = 20
+$ pndcgn
+WARN: max_source_dirs=20 exceeds maximum (16), capping at 16
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-018: Configurable selection limit'
+  It 'enforces configured limit in fzf'
+    create_config "max_source_dirs = 5"
+    When call pndcgn_with_limit_check
+    The stderr should include "max=5"
+    The status should be success
+  End
+
+  It 'caps limit at 16 with warning'
+    create_config "max_source_dirs = 20"
+    When run bin/pndcgn
+    The stderr should include "exceeds maximum (16), capping at 16"
+    The status should be success
+  End
+End
+```
+
+### 3.18. ST-019: Backward Compatibility for Single Directory
+
+**Requirement**: REQ-019
+
+**Objective**: Verify single directory selection works identically to current behavior
+
+**Preconditions**:
+- Existing single-directory workflow works
+- fzf available
+
+**Test steps**:
+1. Select single directory via fzf (Enter without Tab)
+2. Verify no abbreviated prefix added to output files
+3. Provide single directory via CLI argument
+4. Verify fzf not invoked and processing proceeds
+
+**Expected behavior**:
+```log
+# Single directory via fzf
+$ pndcgn
+[Select ./docs, press Enter without Tab]
+Processing: ./docs
+Output: readme.pdf (no prefix)
+
+# Single directory via CLI
+$ pndcgn ./docs ./output
+Processing: ./docs
+Output: readme.pdf (no prefix)
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-019: Backward compatibility'
+  It 'single directory via fzf has no prefix'
+    When call pndcgn_single_dir_fzf
+    The output should not match pattern "*-*-*.pdf"
+    The path "./output/.pndcgn/pdf-*/*.pdf" should be file
+    The status should be success
+  End
+
+  It 'single directory via CLI works as before'
+    When run bin/pndcgn ./docs ./output
+    The output should not include "fzf"
+    The status should be success
+  End
+End
+```
+
+### 3.19. ST-020: Directory Deduplication
+
+**Requirement**: REQ-020
+
+**Objective**: Verify duplicate directories are removed before processing
+
+**Preconditions**:
+- Multiple equivalent directory paths (./dir, dir, /abs/path/dir)
+
+**Test steps**:
+1. Select `./docs` and `docs` (same directory, different paths)
+2. Verify warning logged for duplicate
+3. Verify directory processed only once
+
+**Expected behavior**:
+```log
+$ pndcgn ./docs docs ./output
+WARN: Duplicate directory removed: ./docs
+Processing: ./docs
+[Files processed once]
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-020: Directory deduplication'
+  It 'removes duplicate directories'
+    When run bin/pndcgn ./docs docs ./output
+    The stderr should include "Duplicate directory removed"
+    # Verify directory processed only once
+    The output should match pattern "Processing 1 directories"
+  End
+End
+```
+
+### 3.20. ST-021: Overlapping Directory Detection
+
+**Requirement**: REQ-021, REQ-030
+
+**Objective**: Verify subdirectories of selected directories are excluded
+
+**Preconditions**:
+- Directory structure: ./projects and ./projects/frontend
+
+**Test steps**:
+1. Select both `./projects` and `./projects/frontend`
+2. Verify INFO message logged for exclusion
+3. Verify only parent directory processed
+
+**Expected behavior**:
+```log
+$ pndcgn ./projects ./projects/frontend ./output
+INFO: Excluding subdirectory: ./projects/frontend (contained in ./projects)
+Processing: ./projects
+[Only parent directory processed]
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-021: Overlapping directory detection'
+  It 'excludes subdirectories automatically'
+    When run bin/pndcgn ./projects ./projects/frontend ./output
+    The stderr should include "Excluding subdirectory"
+    The output should include "Processing 1 directories"
+    The status should be success
+  End
+End
+```
+
+### 3.21. ST-022: Abbreviated Source Prefixes
+
+**Requirement**: REQ-022
+
+**Objective**: Verify output filenames use shortest unique prefixes
+
+**Preconditions**:
+- Multiple directories with files: projects/frontend, projects/backend
+
+**Test steps**:
+1. Process both directories
+2. Verify output files use abbreviated prefixes
+3. Verify prefixes are shortest unique
+
+**Expected behavior**:
+```log
+$ pndcgn ./projects/frontend ./projects/backend ./output
+Output files:
+  front--readme.pdf
+  back--readme.pdf
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-022: Abbreviated source prefixes'
+  It 'generates shortest unique prefixes'
+    When call pndcgn_multi_dir_prefix_test
+    The path "./output/.pndcgn/pdf-*/front--*.pdf" should be file
+    The path "./output/.pndcgn/pdf-*/back--*.pdf" should be file
+    The status should be success
+  End
+End
+```
+
+### 3.22. ST-023: CLI Multi-Directory Support
+
+**Requirement**: REQ-023
+
+**Objective**: Verify multiple directories can be specified via CLI arguments
+
+**Preconditions**:
+- Multiple source directories exist
+
+**Test steps**:
+1. Run `pndcgn src1/ src2/ src3/ -o output/`
+2. Verify all three directories processed
+3. Verify abbreviated prefixes used (same as fzf)
+
+**Expected behavior**:
+```log
+$ pndcgn ./docs ./notes ./specs -o ./output
+Processing 3 directories:
+  [1/3] ./docs (12 files)
+  [2/3] ./notes (5 files)
+  [3/3] ./specs (8 files)
+✓ Run complete
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-023: CLI multi-directory support'
+  It 'processes multiple directories from CLI args'
+    When run bin/pndcgn ./docs ./notes ./specs -o ./output
+    The output should include "Processing 3 directories"
+    The status should be success
+  End
+End
+```
+
+### 3.23. ST-024: Selection Limit Enforcement
+
+**Requirement**: REQ-024
+
+**Objective**: Verify selection limits enforced for CLI arguments
+
+**Preconditions**:
+- Config set to max_source_dirs = 4
+
+**Test steps**:
+1. Run `pndcgn dir1 dir2 dir3 dir4 dir5 output/`
+2. Verify error message displayed
+3. Verify exit code 2
+4. Verify processing does not start
+
+**Expected behavior**:
+```log
+$ pndcgn dir1 dir2 dir3 dir4 dir5 output/
+ERROR: Too many source directories (max: 4, got: 5)
+[Exit code: 2]
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-024: Selection limit enforcement'
+  It 'rejects CLI args exceeding limit'
+    create_config "max_source_dirs = 4"
+    When run bin/pndcgn dir1 dir2 dir3 dir4 dir5 output/
+    The stderr should include "Too many source directories (max: 4, got: 5)"
+    The status should be failure
+    The status should equal 2
+  End
+End
+```
+
+### 3.24. ST-025: fzf Fallback for Unavailability
+
+**Requirement**: REQ-025
+
+**Objective**: Verify numbered list fallback when fzf unavailable
+
+**Preconditions**:
+- fzf not installed or not in PATH
+
+**Test steps**:
+1. Run `pndcgn` with fzf unavailable
+2. Verify numbered list displayed
+3. Enter "1,3" to select directories
+4. Verify selected directories processed
+
+**Expected behavior**:
+```log
+$ pndcgn
+[1] ./docs
+[2] ./notes
+[3] ./specs
+Enter directory numbers (comma-separated, max 4): 1,3
+Processing 2 directories...
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-025: fzf fallback'
+  It 'falls back to numbered list when fzf unavailable'
+    When call pndcgn_without_fzf "1,3"
+    The output should include "[1]"
+    The output should include "Processing 2 directories"
+    The status should be success
+  End
+End
+```
+
+### 3.25. ST-026: Graceful Degradation on Directory Failure
+
+**Requirement**: REQ-026
+
+**Objective**: Verify processing continues if one directory fails
+
+**Preconditions**:
+- Multiple directories, one unreadable
+
+**Test steps**:
+1. Select directories including one unreadable directory
+2. Verify warning logged for failed directory
+3. Verify other directories processed successfully
+
+**Expected behavior**:
+```log
+$ pndcgn ./docs ./secret ./notes ./output
+WARN: Directory not readable: ./secret
+Processing: ./docs
+Processing: ./notes
+✓ Run complete: 2/3 directories processed successfully
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-026: Graceful degradation'
+  It 'continues processing when one directory fails'
+    create_unreadable_dir "./secret"
+    When run bin/pndcgn ./docs ./secret ./notes ./output
+    The stderr should include "Directory not readable"
+    The output should include "2/3 directories processed"
+    The status should be success
+  End
+End
+```
+
+### 3.26. ST-027: Zero Directory Selection Handling
+
+**Requirement**: REQ-027
+
+**Objective**: Verify fallback to current directory when no selection
+
+**Preconditions**:
+- fzf available
+
+**Test steps**:
+1. Launch fzf and press ESC (or Enter with nothing selected)
+2. Verify warning message
+3. Verify current directory used
+
+**Expected behavior**:
+```log
+$ pndcgn
+[Press ESC in fzf]
+WARN: No directories selected, using current directory
+Processing: ./
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-027: Zero directory selection'
+  It 'falls back to current directory'
+    When call pndcgn_zero_selection
+    The stderr should include "No directories selected, using current directory"
+    The output should include "Processing: ./"
+    The status should be success
+  End
+End
+```
+
+### 3.27. ST-028: fzf Header Display
+
+**Requirement**: REQ-028
+
+**Objective**: Verify fzf header displays selection limit
+
+**Preconditions**:
+- fzf available
+- Config set to max_source_dirs = 5
+
+**Test steps**:
+1. Launch pndcgn (no args)
+2. Verify fzf header shows "max=5"
+
+**Expected behavior**:
+```log
+[fzf displays:]
+Select source directories (Tab=select, Enter=confirm, max=5)
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-028: fzf header display'
+  It 'shows selection limit in header'
+    create_config "max_source_dirs = 5"
+    When call pndcgn_check_fzf_header
+    The output should include "max=5"
+  End
+End
+```
+
+### 3.28. ST-029: Logging Conventions
+
+**Requirement**: REQ-029
+
+**Objective**: Verify consistent logging format for multi-directory operations
+
+**Preconditions**:
+- Multiple directories to process
+
+**Test steps**:
+1. Process multiple directories
+2. Verify INFO/WARN/ERROR messages follow existing conventions
+3. Verify messages logged to stderr
+
+**Expected behavior**:
+```log
+INFO: Discovering files in: ./docs
+INFO: Discovering files in: ./notes
+WARN: Duplicate directory removed: ./docs
+ERROR: Directory not readable: ./secret
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-029: Logging conventions'
+  It 'uses consistent log format'
+    When run bin/pndcgn ./docs ./notes ./output
+    The stderr should match pattern "INFO: *"
+    The stderr should match pattern "WARN: *"
+  End
+End
+```
+
+### 3.29. ST-033: All Directories Fail Handling
+
+**Requirement**: REQ-033
+
+**Objective**: Verify error when all directories fail
+
+**Preconditions**:
+- All selected directories unreadable
+
+**Test steps**:
+1. Select multiple directories, all unreadable
+2. Verify error message
+3. Verify exit code 1
+
+**Expected behavior**:
+```log
+$ pndcgn ./secret1 ./secret2 ./secret3 ./output
+ERROR: All selected directories are unreadable. No directories could be processed.
+[Exit code: 1]
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-033: All directories fail'
+  It 'exits with error when all directories fail'
+    create_unreadable_dirs "./secret1" "./secret2"
+    When run bin/pndcgn ./secret1 ./secret2 ./output
+    The stderr should include "All selected directories are unreadable"
+    The status should be failure
+    The status should equal 1
+  End
+End
+```
+
+### 3.30. ST-034: Ctrl+C Graceful Handling
+
+**Requirement**: REQ-034
+
+**Objective**: Verify graceful handling of SIGINT during processing
+
+**Preconditions**:
+- Multiple directories processing
+
+**Test steps**:
+1. Start processing multiple directories
+2. Send SIGINT (Ctrl+C) during processing
+3. Verify current file completes
+4. Verify summary logged
+5. Verify exit code 130
+
+**Expected behavior**:
+```log
+$ pndcgn ./docs ./notes ./specs ./output
+Processing: ./docs
+[Ctrl+C pressed]
+INFO: Interrupted. Completed: 1/3 directories, 5/25 files
+[Exit code: 130]
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-034: Ctrl+C graceful handling'
+  It 'completes current file before stopping'
+    When call pndcgn_with_interrupt
+    The stderr should include "Interrupted"
+    The stderr should include "Completed:"
+    The status should equal 130
+  End
+End
+```
+
+### 3.31. ST-035: Fallback Invalid Input Handling
+
+**Requirement**: REQ-035
+
+**Objective**: Verify invalid input handled gracefully in fallback prompt
+
+**Preconditions**:
+- fzf unavailable
+
+**Test steps**:
+1. Launch numbered list fallback
+2. Enter invalid input: "1,abc,3,99"
+3. Verify invalid entries shown
+4. Press 'c' to continue
+5. Verify valid selections processed
+
+**Expected behavior**:
+```log
+Enter directory numbers (comma-separated, max 4): 1,abc,3,99
+Invalid entries: abc (not a number), 99 (out of range)
+Press 'c' to continue with valid selections (1,3) or 'r' to re-prompt: c
+Processing directories: 1, 3
+```
+
+**shellspec test**:
+```bash
+Describe 'ST-035: Fallback invalid input handling'
+  It 'handles invalid input gracefully'
+    When call pndcgn_fallback_invalid_input "1,abc,3,99" "c"
+    The output should include "Invalid entries"
+    The output should include "Processing directories: 1, 3"
+    The status should be success
   End
 End
 ```

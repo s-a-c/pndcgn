@@ -1,0 +1,11 @@
+.git
+coverage/
+.shellspec-coverage/
+.pndcgn/
+*.sqlite
+*.sqlite3
+*.db
+*.log*
+.env*
+tmp/
+tests.results/

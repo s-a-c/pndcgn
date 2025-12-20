@@ -12,22 +12,16 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ```bash
 # Run from project root - basic execution
-./bin/pdf-generator
+./bin/pndcgn
 
 # Preview what would be processed (dry-run mode)
-./bin/pdf-generator --dry-run
+./bin/pndcgn --dry-run
 
-# Force regeneration, ignoring cache
-./bin/pdf-generator --force
+# Finalize a dry-run
+./bin/pndcgn --finalize <run-id>
 
-# Clean all generated files and cache
-./bin/pdf-generator --clean
-
-# Resume an interrupted run
-./bin/pdf-generator --resume
-
-# Enable verbose output (shows Pandoc commands)
-./bin/pdf-generator -v
+# Enable verbose output
+./bin/pndcgn --verbose
 ```
 
 ### 2.2. Testing
@@ -37,26 +31,25 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 shellspec
 
 # Run specific test file
-shellspec tests/pdf_generator.spec.sh
+shellspec tests/pndcgn_spec.sh
+shellspec tests/config_spec.sh
+shellspec tests/processing_spec.sh
+shellspec tests/database_spec.sh
+shellspec tests/utilities_spec.sh
 
 # Run specific test by line number
-shellspec tests/pdf_generator.spec.sh:123
+shellspec tests/pndcgn_spec.sh:25
 
 # Generate coverage report with kcov (if installed)
 shellspec --kcov
 
 # View coverage report
-open shellspec-coverage/index.html
+open tests.results/coverage/index.html
 ```
 
 ### 2.3. Configuration
 
-```bash
-# Initialize default configuration
-./bin/pdf-generator --init
-
-# This creates pdf-generator.toml with default settings
-```
+Configuration is managed via `.pndcgnignore` files (similar to `.gitignore`). The tool auto-creates this file on first run if it doesn't exist.
 
 ## 3. Code Architecture
 
@@ -65,28 +58,35 @@ open shellspec-coverage/index.html
 The codebase follows a modular shell script architecture with a namespace prefix (`pndcgn_`) for all functions and variables:
 
 ```
-bin/pdf-generator         # Main controller - orchestrates entire workflow
-src/constants.sh          # ANSI color codes and shared constants
+bin/pndcgn                # Main controller - orchestrates entire workflow
+src/
+  constants.sh            # ANSI color codes and shared constants
+  utilities.sh            # Helper functions (logging, paths, ULID fallback)
+  database.sh             # SQLite operations and caching
+  processing.sh           # File processing and conversion logic
 tests/
   spec_helper.sh          # Test utilities and mocking framework
-  pdf_generator.spec.sh   # Main test suite
-  config_spec.sh          # Configuration tests
-  constants_spec.sh       # Constants tests
+  pndcgn_spec.sh          # Main CLI entrypoint tests
+  config_spec.sh          # Configuration management tests
+  processing_spec.sh      # Processing function tests
+  database_spec.sh         # Database operation tests
+  utilities_spec.sh        # Utility function tests
+  constants_spec.sh        # Constants validation tests
 docs/                     # Comprehensive technical documentation
 ```
 
 ### 3.2. Key Design Patterns
 
 **State Management**:
-- Uses SQLite database (`prerendered/cache.sqlite`) for persistent state
+- Uses SQLite database (XDG-compliant location: `~/.local/state/pndcgn/pndcgn.db`) for persistent state
 - Tracks runs via ULID-based run identifiers (sortable, timestamp-embedded)
 - Implements fingerprint-based caching for change detection
 - Supports WAL (Write-Ahead Logging) mode for concurrent access
 
 **Configuration System**:
-- TOML-based configuration file (`pdf-generator.toml`)
-- Defaults use parameter expansion: `${PNDCGN_CFG_OUTPUT_ROOT:-prerendered}`
-- Readonly variables finalized after config loading
+- `.pndcgnignore` file (similar to `.gitignore`) for file exclusion patterns
+- Auto-created on first run with default patterns
+- Seed-once policy: never auto-updated, explicit `--reseed` action required
 
 **Error Handling**:
 - Strict mode: `set -euo pipefail`
@@ -107,18 +107,14 @@ Variables:
 
 ### 3.4. Current Implementation Status
 
-The main script (`bin/pdf-generator`) is partially implemented with:
-- Complete argument parsing and configuration loading
-- Placeholder implementations for core processing functions:
-  - `pndcgn_initialize()` - Basic prerequisite checking
-  - `pndcgn_start_run()` - Simplified run initialization
-  - `pndcgn_process_directories()` - Stub for main processing
-  - `pndcgn_finish_run()` - Basic finalization
-
-The planned module structure (documented in `docs/`) includes additional files that are not yet implemented:
-- `src/database.sh` - SQLite operations
-- `src/processing.sh` - Conversion logic
-- `src/utilities.sh` - Helper functions
+The main script (`bin/pndcgn`) is fully implemented with:
+- Complete argument parsing and validation
+- Module-based architecture with all source files implemented:
+  - `src/constants.sh` - ANSI codes and shared constants
+  - `src/utilities.sh` - Helper functions (logging, paths, ULID fallback, prerequisites)
+  - `src/database.sh` - SQLite operations and caching
+  - `src/processing.sh` - File processing, fingerprinting, and conversion logic
+- Comprehensive test suite with 88 examples (89.7% success rate)
 
 ## 4. Testing Framework
 
@@ -148,22 +144,26 @@ cleanup_mocks()      # Unsets all mock functions
 
 ### 4.4. Writing Tests
 
-Follow the existing patterns in `tests/pdf_generator.spec.sh`:
+Follow the existing patterns in `tests/pndcgn_spec.sh` and other spec files:
 ```bash
 Describe "Component name"
     BeforeAll 'setup_test_env'
     AfterAll 'cleanup_test_env'
     BeforeEach 'mock_all_commands'
-    
+    AfterEach 'cleanup_mocks'
+
     Context "when condition"
         It "does something"
-            When run "$script" --flag
+            . "${SHELLSPEC_PROJECT_ROOT:-$PWD}/src/module.sh"
+            When call pndcgn_function_name "arg"
             The status should be success
             The output should include "expected text"
         End
     End
 End
 ```
+
+**Note**: For accurate coverage tracking, use `When run source` instead of direct dot sourcing (see `tests/README.md` for details).
 
 ## 5. Dependencies
 
@@ -179,7 +179,7 @@ Required for execution:
 
 The tool integrates with these Pandoc filters (documented in README.md):
 - `pandoc-plantuml-filter` - PlantUML diagram rendering
-- `mermaid-filter` - Mermaid diagram rendering  
+- `mermaid-filter` - Mermaid diagram rendering
 - `pandoc-dbml-filter` - DBML diagram rendering
 - `pandoc-fignos` - Figure numbering
 - `pandoc-tablenos` - Table numbering
@@ -253,9 +253,9 @@ When modifying configuration parsing, ensure:
 
 ### 8.2. Database Schema
 
-The SQLite database (`prerendered/cache.sqlite`) uses two main tables:
-- `runs` - Tracks execution runs with ULID, timestamps, status, and stats JSON
-- `generated_pdfs` - Maps directory paths to run IDs with fingerprints
+The SQLite database (XDG location: `~/.local/state/pndcgn/pndcgn.db`) uses:
+- `runs` - Tracks execution runs with ULID, timestamps, status, and statistics
+- `generated_files` - Maps fingerprints to output file paths with run IDs
 
 Always use WAL mode and parameterized queries via `.param set`.
 
@@ -263,12 +263,9 @@ Always use WAL mode and parameterized queries via `.param set`.
 
 Generated files go to:
 ```
-${PNDCGN_OUTPUT_ROOT}/pdf/
-${PNDCGN_OUTPUT_ROOT}/cache.sqlite
-${PNDCGN_OUTPUT_ROOT}/pdf/_index.md  (run report)
+${TARGET_DIR}/.pndcgn/${TYPE}-${RUN_ID}/
+  ├── {dewey-prefix}-{filename}.{ext}  # Generated outputs
+  └── _index.md                         # Run index with navigation
 ```
 
-Excluded directories (never processed):
-- `./${PNDCGN_OUTPUT_ROOT}`
-- `./dot-scratch`, `./.git`, `./.idx`
-- `./node_modules`, `./vendor`
+The output directory structure uses Dewey Decimal-style prefixes for logical sorting and organization.

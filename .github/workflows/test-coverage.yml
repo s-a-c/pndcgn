@@ -1,0 +1,119 @@
+# GitHub Actions workflow for test coverage
+#
+# Compliant with [AGENTS.md](AGENTS.md)
+#
+# Purpose: Run tests with kcov on Linux (Ubuntu) for accurate coverage tracking
+# macOS has ptrace limitations that prevent kcov from working correctly
+
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-coverage:
+    name: Run Tests with Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bash \
+            sqlite3 \
+            pandoc \
+            git \
+            curl \
+            fzf \
+            build-essential \
+            cmake \
+            binutils-dev \
+            libcurl4-openssl-dev \
+            zlib1g-dev \
+            libdw-dev \
+            libiberty-dev \
+            libssl-dev
+
+      - name: Install ShellSpec
+        run: |
+          curl -fsSL https://git.io/shellspec | sh -s -- --yes
+          # Ensure shellspec is in PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          shellspec --version
+
+      - name: Install kcov
+        run: |
+          # Build kcov from source (v43 is latest stable, v44 only has pre-release tags)
+          git clone --depth=1 https://github.com/SimonKagstrom/kcov.git /tmp/kcov
+          cd /tmp/kcov
+          # Use v43 (latest stable) or fallback to master if tag doesn't exist
+          git fetch --tags --depth=1
+          git checkout v43 2>/dev/null || git checkout master || true
+          mkdir build && cd build
+          cmake ..
+          make -j$(nproc)
+          sudo make install
+          rm -rf /tmp/kcov
+          kcov --version
+
+      - name: Run tests with kcov
+        run: |
+          # Ensure shellspec is in PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          # Run tests with kcov coverage
+          shellspec --kcov --format documentation
+
+      - name: Generate coverage reports
+        run: |
+          if [ -f tests.results/generate-reports.sh ]; then
+            tests.results/generate-reports.sh
+          fi
+
+      - name: Find and prepare coverage file
+        run: |
+          # ShellSpec/kcov generates coverage in tests.results/coverage/
+          # Find the cobertura.xml file (may be in date-stamped subdirectory)
+          COVERAGE_FILE=$(find tests.results/coverage -name "cobertura.xml" -type f | head -1)
+          if [ -n "$COVERAGE_FILE" ]; then
+            echo "Found coverage file: $COVERAGE_FILE"
+            # Copy to a standard location for Codecov
+            mkdir -p tests.results/coverage
+            cp "$COVERAGE_FILE" tests.results/coverage/cobertura.xml
+            echo "Coverage file prepared: tests.results/coverage/cobertura.xml"
+            ls -lh tests.results/coverage/cobertura.xml
+          else
+            echo "Warning: cobertura.xml not found. Coverage may not be uploaded."
+            find tests.results/coverage -type f | head -10 || true
+          fi
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            tests.results/coverage/
+            tests.results/reports/
+          retention-days: 30
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: tests.results/coverage/cobertura.xml
+          # Token is optional for public repos, required for private repos
+          # Add CODECOV_TOKEN secret in GitHub repo settings if needed
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          verbose: true
+          # Codecov configuration file
+          config: codecov.yml

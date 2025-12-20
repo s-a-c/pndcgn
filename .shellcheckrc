@@ -1,0 +1,19 @@
+# Project-wide ShellCheck configuration for pndcgn
+# Option B: treat style/info/DSL-related codes as non-fatal and focus on real correctness bugs.
+#
+# Disabled codes (primarily noisy in tests / DSL strings / sourced-constant files):
+# - SC1036,SC1088: complex command strings in ShellSpec `When run` DSL
+# - SC1078,SC1079,SC2016: mixed quoting in test DSL expressions
+# - SC1091: "not following" for sourced files; our tests source them explicitly
+# - SC2027,SC2034: "surrounding quotes unquote" and "appears unused" for exported constants and helpers
+# - SC2154: variables defined in sourced files (e.g., color constants)
+# - SC2168: `local` in ShellSpec `It/Context` blocks, which ShellCheck can't model
+# - SC2329: "function is never invoked" in test doubles and helpers
+#
+# NOTE: Style / control-flow hints like SC2053, SC2249, SC2250, SC2310, SC2312 are now
+#       enforced again for core code (including `bin/` and `src/`). Tests and helpers
+#       that need to opt out should use file- or line-level `# shellcheck disable=...`.
+#
+# If a code from this list reveals a real bug in future, prefer re-enabling it locally
+# (via `# shellcheck enable=CODE`) rather than removing it here.
+disable=SC1036,SC1078,SC1079,SC1088,SC1091,SC2016,SC2027,SC2034,SC2154,SC2168,SC2329
